@@ -55,7 +55,7 @@ const METER_FILTER_OPTIONS: IDropdownOption[] = [
 const getClassNames = memoizeFunction((theme: ITheme) =>
   mergeStyleSets({
     stepperBar: {
-      padding: '12px 0',
+      padding: '8px 0',
       borderBottom: `1px solid ${theme.palette.neutralLight}`,
     },
     stepCircleActive: {
@@ -89,7 +89,7 @@ const getClassNames = memoizeFunction((theme: ITheme) =>
     productDesc: { fontSize: 12, color: theme.palette.neutralSecondary },
     paginationBar: {
       display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 12,
-      padding: '8px 0', borderTop: `1px solid ${theme.palette.neutralLight}`,
+      padding: '4px 0', borderTop: `1px solid ${theme.palette.neutralLight}`,
     },
     selectedPill: {
       display: 'inline-flex', alignItems: 'center', gap: 4,
@@ -695,7 +695,7 @@ export const ProductSearchPanel: React.FC<IProductSearchPanelProps> = ({
   );
 
   const renderSearchStep = () => (
-    <Stack tokens={{ childrenGap: 12 }} styles={{ root: { display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' } }}>
+    <Stack tokens={{ childrenGap: 8 }} styles={{ root: { display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' } }}>
       <Stack horizontal tokens={{ childrenGap: 0 }} styles={{ root: { flexShrink: 0 } }}>
         <Dropdown
           selectedKey={searchFilter}
@@ -947,7 +947,7 @@ export const ProductSearchPanel: React.FC<IProductSearchPanelProps> = ({
     >
       <Stack tokens={{ childrenGap: 0 }} styles={{ root: { display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' } }}>
         {showStepper && renderStepper()}
-        <Stack styles={{ root: { display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden', paddingTop: 16 } }}>
+        <Stack styles={{ root: { display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden', paddingTop: 8 } }}>
           {renderMainContent()}
         </Stack>
       </Stack>
