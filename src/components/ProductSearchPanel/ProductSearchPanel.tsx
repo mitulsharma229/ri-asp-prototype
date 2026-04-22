@@ -744,7 +744,7 @@ export const ProductSearchPanel: React.FC<IProductSearchPanelProps> = ({
           <Text variant="small" styles={{ root: { color: theme.semanticColors.bodySubtext } }}>
             Showing {Math.min((searchPage + 1) * SEARCH_PAGE_SIZE, filteredProducts.length)} of {filteredProducts.length} results
           </Text>
-          <div style={{ maxHeight: 'calc(100vh - 380px)', overflow: 'auto' }}>
+          <div style={{ maxHeight: 'calc(100vh - 480px)', overflow: 'auto' }}>
             <DetailsList items={pagedSearchResults} columns={makeSearchColumns(pagedSearchResults)} selectionMode={SelectionMode.none} layoutMode={DetailsListLayoutMode.justified} compact getKey={(item) => (item as ICatalogProduct).id} />
           </div>
           {filteredProducts.length > SEARCH_PAGE_SIZE && (
@@ -793,7 +793,7 @@ export const ProductSearchPanel: React.FC<IProductSearchPanelProps> = ({
         </Stack>
       </Stack>
 
-      <div style={{ maxHeight: 'calc(100vh - 420px)', overflow: 'auto' }}>
+      <div style={{ maxHeight: 'calc(100vh - 520px)', overflow: 'auto' }}>
         <DetailsList items={pagedReviewProducts} columns={reviewColumns} selectionMode={SelectionMode.none} layoutMode={DetailsListLayoutMode.justified} compact getKey={(item) => (item as ICatalogProduct).id} />
       </div>
 
