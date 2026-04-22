@@ -904,9 +904,10 @@ export const ProductSearchPanel: React.FC<IProductSearchPanelProps> = ({
       headerText={panelHeader}
       isFooterAtBottom onRenderFooterContent={subView === 'main' ? onRenderFooterContent : undefined}
       styles={{
-        main: { padding: 0 },
-        content: { display: 'flex', flexDirection: 'column', height: '100%', padding: '0 24px' },
+        main: { padding: 0, overflow: 'hidden' },
+        contentInner: { display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' },
         scrollableContent: { display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' },
+        content: { display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden', padding: '0 24px' },
         footer: {
           borderTop: `1px solid ${theme.palette.neutralLight}`,
           backgroundColor: theme.palette.white,
