@@ -146,7 +146,6 @@ export const ProductGrid: React.FC<IProductGridProps> = ({
   onBulkEditApply,
   onSave,
   onAddProducts,
-  hasUnsavedChanges,
 }) => {
   const theme = useTheme();
   const classNames = getClassNames(theme);
@@ -214,7 +213,7 @@ export const ProductGrid: React.FC<IProductGridProps> = ({
     if (filterField && filterValue) {
       const fv = filterValue.toLowerCase();
       result = result.filter((p) => {
-        const val = String((p as Record<string, unknown>)[filterField] || '').toLowerCase();
+        const val = String((p as unknown as Record<string, unknown>)[filterField] || '').toLowerCase();
         return val.includes(fv);
       });
     }

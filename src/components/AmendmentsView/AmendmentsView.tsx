@@ -264,7 +264,7 @@ export const AmendmentsView: React.FC<IAmendmentsViewProps> = ({ amendments }) =
           </tr>
         </thead>
         <tbody>
-          {tableRows.map((row, i) => (
+          {tableRows.map((_, i) => (
             <tr key={i} style={{ borderBottom: '1px solid #e1dfdd' }}>
               <td style={{ padding: '2px 5px' }}>Fabric Capacity Reservation</td>
               <td style={{ padding: '2px 5px' }}>1</td>

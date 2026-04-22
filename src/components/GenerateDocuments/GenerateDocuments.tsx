@@ -5,7 +5,6 @@ import { PrimaryButton, DefaultButton } from '@fluentui/react/lib/Button';
 import { Checkbox } from '@fluentui/react/lib/Checkbox';
 import { ChoiceGroup, IChoiceGroupOption } from '@fluentui/react/lib/ChoiceGroup';
 import { ProgressIndicator } from '@fluentui/react/lib/ProgressIndicator';
-import { MessageBar, MessageBarType } from '@fluentui/react/lib/MessageBar';
 import { Icon } from '@fluentui/react/lib/Icon';
 import { Link } from '@fluentui/react/lib/Link';
 import { Dialog, DialogType, DialogFooter } from '@fluentui/react/lib/Dialog';

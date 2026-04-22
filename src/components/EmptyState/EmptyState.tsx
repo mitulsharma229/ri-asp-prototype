@@ -6,7 +6,7 @@ import { useTheme, ITheme } from '@fluentui/react';
 import { mergeStyleSets } from '@fluentui/merge-styles';
 import { memoizeFunction } from '@fluentui/utilities';
 
-const getClassNames = memoizeFunction((theme: ITheme) =>
+const getClassNames = memoizeFunction((_theme: ITheme) =>
   mergeStyleSets({
     root: {
       minHeight: 400,

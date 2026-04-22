@@ -1,7 +1,6 @@
 import * as React from 'react';
 import { Stack } from '@fluentui/react/lib/Stack';
 import { Text } from '@fluentui/react/lib/Text';
-import { MessageBar, MessageBarType } from '@fluentui/react/lib/MessageBar';
 import { Pivot, PivotItem } from '@fluentui/react/lib/Pivot';
 import { DetailsList, IColumn, SelectionMode, DetailsListLayoutMode } from '@fluentui/react/lib/DetailsList';
 import { Icon } from '@fluentui/react/lib/Icon';

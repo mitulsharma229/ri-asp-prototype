@@ -7,7 +7,6 @@ import { useTheme, ITheme } from '@fluentui/react';
 import { mergeStyleSets } from '@fluentui/merge-styles';
 import { memoizeFunction } from '@fluentui/utilities';
 import { Persona, PersonaSize } from '@fluentui/react/lib/Persona';
-import { Icon } from '@fluentui/react/lib/Icon';
 
 const getClassNames = memoizeFunction((theme: ITheme) =>
   mergeStyleSets({
