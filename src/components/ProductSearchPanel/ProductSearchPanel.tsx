@@ -695,7 +695,7 @@ export const ProductSearchPanel: React.FC<IProductSearchPanelProps> = ({
   );
 
   const renderSearchStep = () => (
-    <Stack tokens={{ childrenGap: 12 }} styles={{ root: { flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' } }}>
+    <Stack tokens={{ childrenGap: 12 }}>
       <Stack horizontal tokens={{ childrenGap: 0 }}>
         <Dropdown
           selectedKey={searchFilter}
@@ -731,7 +731,7 @@ export const ProductSearchPanel: React.FC<IProductSearchPanelProps> = ({
           <Text styles={{ root: { color: theme.palette.neutralSecondary } }}>product family, or business division</Text>
         </Stack>
       ) : (
-        <Stack tokens={{ childrenGap: 8 }} styles={{ root: { flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' } }}>
+        <Stack tokens={{ childrenGap: 8 }}>
           {/* Filter bar on search step */}
           {renderFilterBar(
             'search',
@@ -741,14 +741,14 @@ export const ProductSearchPanel: React.FC<IProductSearchPanelProps> = ({
             activeSearchFilterPill, setActiveSearchFilterPill,
           )}
 
-          <Text variant="small" styles={{ root: { color: theme.semanticColors.bodySubtext, flexShrink: 0 } }}>
+          <Text variant="small" styles={{ root: { color: theme.semanticColors.bodySubtext } }}>
             Showing {Math.min((searchPage + 1) * SEARCH_PAGE_SIZE, filteredProducts.length)} of {filteredProducts.length} results
           </Text>
-          <div style={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
+          <div style={{ maxHeight: 'calc(100vh - 380px)', overflow: 'auto' }}>
             <DetailsList items={pagedSearchResults} columns={makeSearchColumns(pagedSearchResults)} selectionMode={SelectionMode.none} layoutMode={DetailsListLayoutMode.justified} compact getKey={(item) => (item as ICatalogProduct).id} />
           </div>
           {filteredProducts.length > SEARCH_PAGE_SIZE && (
-            <div className={classNames.paginationBar} style={{ flexShrink: 0 }}>
+            <div className={classNames.paginationBar}>
               <Text styles={{ root: { fontSize: 12, color: theme.palette.neutralSecondary } }}>
                 Page {searchPage + 1} of {searchTotalPages}
               </Text>
@@ -764,7 +764,7 @@ export const ProductSearchPanel: React.FC<IProductSearchPanelProps> = ({
   );
 
   const renderReviewStep = () => (
-    <Stack tokens={{ childrenGap: 12 }} styles={{ root: { flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' } }}>
+    <Stack tokens={{ childrenGap: 12 }}>
       <SearchBox placeholder="Search in review prices by part number, product description, product family or group" styles={{ root: { width: '100%' } }} />
 
       {renderFilterBar(
@@ -793,13 +793,13 @@ export const ProductSearchPanel: React.FC<IProductSearchPanelProps> = ({
         </Stack>
       </Stack>
 
-      <div style={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
+      <div style={{ maxHeight: 'calc(100vh - 420px)', overflow: 'auto' }}>
         <DetailsList items={pagedReviewProducts} columns={reviewColumns} selectionMode={SelectionMode.none} layoutMode={DetailsListLayoutMode.justified} compact getKey={(item) => (item as ICatalogProduct).id} />
       </div>
 
       {/* Review pagination */}
       {filteredReviewProducts.length > REVIEW_PAGE_SIZE && (
-        <div className={classNames.paginationBar} style={{ flexShrink: 0 }}>
+        <div className={classNames.paginationBar}>
           <Text styles={{ root: { fontSize: 12, color: theme.palette.neutralSecondary } }}>
             Page {reviewPage + 1} of {reviewTotalPages}
           </Text>
@@ -904,10 +904,9 @@ export const ProductSearchPanel: React.FC<IProductSearchPanelProps> = ({
       headerText={panelHeader}
       isFooterAtBottom onRenderFooterContent={subView === 'main' ? onRenderFooterContent : undefined}
       styles={{
-        main: { padding: 0, overflow: 'hidden' },
-        contentInner: { display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' },
-        scrollableContent: { display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' },
-        content: { display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden', padding: '0 24px' },
+        main: { padding: 0 },
+        content: { padding: '0 24px' },
+        scrollableContent: { overflow: 'auto' },
         footer: {
           borderTop: `1px solid ${theme.palette.neutralLight}`,
           backgroundColor: theme.palette.white,
@@ -916,9 +915,9 @@ export const ProductSearchPanel: React.FC<IProductSearchPanelProps> = ({
         },
       }}
     >
-      <Stack tokens={{ childrenGap: 0 }} styles={{ root: { flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' } }}>
+      <Stack tokens={{ childrenGap: 0 }} styles={{ root: { flex: 1 } }}>
         {showStepper && renderStepper()}
-        <Stack styles={{ root: { flex: 1, paddingTop: 16, overflow: 'hidden', minHeight: 0 } }}>
+        <Stack styles={{ root: { paddingTop: 16 } }}>
           {renderMainContent()}
         </Stack>
       </Stack>
