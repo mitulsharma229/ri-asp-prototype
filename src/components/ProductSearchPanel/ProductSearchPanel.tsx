@@ -14,7 +14,7 @@ import { Callout, DirectionalHint } from '@fluentui/react/lib/Callout';
 import { useTheme, ITheme } from '@fluentui/react';
 import { mergeStyleSets } from '@fluentui/merge-styles';
 import { memoizeFunction } from '@fluentui/utilities';
-import { ICatalogProduct, PROFILE_OPTIONS, TENANT_OPTIONS } from '../../types/models';
+import { ICatalogProduct, TENANT_OPTIONS } from '../../types/models';
 
 type WizardStep = 'search' | 'review' | 'configure';
 type SubView = 'main' | 'addedProducts' | 'showErrors';
@@ -33,6 +33,7 @@ const isAmendmentCodeQuery = (query: string): boolean => /^M\d+/i.test(query.tri
 
 const COMMITMENT_FILTER_OPTIONS: IDropdownOption[] = [
   { key: 'All', text: 'All' },
+  { key: '1 Month', text: '1 Month' },
   { key: '1 Year', text: '1 Year' },
   { key: '3 Years', text: '3 Years' },
   { key: '5 Years', text: '5 Years' },
@@ -92,13 +93,16 @@ const getClassNames = memoizeFunction((theme: ITheme) =>
       padding: '4px 0', borderTop: `1px solid ${theme.palette.neutralLight}`,
     },
     selectedPill: {
-      display: 'inline-flex', alignItems: 'center', gap: 4,
-      backgroundColor: theme.palette.themeLighter, borderRadius: 12, padding: '2px 10px',
-      fontSize: 12, color: theme.palette.themeDarkAlt,
+      display: 'inline-flex', alignItems: 'center', gap: 6,
+      backgroundColor: theme.palette.neutralLighterAlt,
+      border: `1px solid ${theme.palette.neutralTertiaryAlt}`,
+      borderRadius: 2, padding: '4px 8px',
+      fontSize: 12, color: theme.palette.neutralPrimary,
     },
     pillClose: {
-      cursor: 'pointer', fontSize: 10, color: theme.palette.themeDarkAlt,
+      cursor: 'pointer', fontSize: 8, color: theme.palette.neutralSecondary,
       marginLeft: 2,
+      selectors: { ':hover': { color: theme.palette.neutralPrimary } },
     },
     searchableDropdownTrigger: {
       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -235,7 +239,6 @@ export const ProductSearchPanel: React.FC<IProductSearchPanelProps> = ({
   const [searchQuery, setSearchQuery] = React.useState('');
   const [hasSearched, setHasSearched] = React.useState(false);
   const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
-  const [selectedProfiles, setSelectedProfiles] = React.useState<string[]>([]);
   const [selectedTenants, setSelectedTenants] = React.useState<string[]>([]);
   const [searchFilter, setSearchFilter] = React.useState<string>('default');
   const [searchInputValue, setSearchInputValue] = React.useState('');
@@ -278,7 +281,6 @@ export const ProductSearchPanel: React.FC<IProductSearchPanelProps> = ({
       setSearchInputValue('');
       setHasSearched(false);
       setSelectedIds(new Set());
-      setSelectedProfiles([]);
       setSelectedTenants([]);
       setSearchFilter('default');
       setAddedProductsSearch('');
@@ -570,8 +572,8 @@ export const ProductSearchPanel: React.FC<IProductSearchPanelProps> = ({
       : selectedProducts;
 
     return (
-      <Stack tokens={{ childrenGap: 12 }} styles={{ root: { flex: 1 } }}>
-        <Link onClick={() => setSubView('main')} styles={{ root: { fontSize: 13 } }}>
+      <Stack tokens={{ childrenGap: 12 }} styles={{ root: { flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' } }}>
+        <Link onClick={() => setSubView('main')} styles={{ root: { fontSize: 13, flexShrink: 0 } }}>
           <Icon iconName="ChevronLeft" styles={{ root: { fontSize: 10, marginRight: 4 } }} />Back
         </Link>
         <SearchBox
@@ -584,15 +586,17 @@ export const ProductSearchPanel: React.FC<IProductSearchPanelProps> = ({
         <Stack horizontal verticalAlign="center">
           <ActionButton iconProps={{ iconName: 'Delete' }} text="Delete all" onClick={() => { setSelectedIds(new Set()); setProductAmendmentMap(new Map()); }} />
         </Stack>
-        <Text styles={{ root: { fontSize: 13 } }}>Showing <strong>{filtered.length}</strong> products</Text>
-        <DetailsList
-          items={filtered}
-          columns={addedProductsColumns}
-          selectionMode={SelectionMode.none}
-          layoutMode={DetailsListLayoutMode.justified}
-          compact
-          getKey={(item) => (item as ICatalogProduct).id}
-        />
+        <Text styles={{ root: { fontSize: 13, flexShrink: 0 } }}>Showing <strong>{filtered.length}</strong> products</Text>
+        <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
+          <DetailsList
+            items={filtered}
+            columns={addedProductsColumns}
+            selectionMode={SelectionMode.none}
+            layoutMode={DetailsListLayoutMode.justified}
+            compact
+            getKey={(item) => (item as ICatalogProduct).id}
+          />
+        </div>
       </Stack>
     );
   };
@@ -700,7 +704,7 @@ export const ProductSearchPanel: React.FC<IProductSearchPanelProps> = ({
         <Dropdown
           selectedKey={searchFilter}
           options={[
-            { key: 'default', text: 'All products' },
+            { key: 'default', text: 'Default' },
             { key: 'amendment', text: 'Amendment code' },
             { key: 'productName', text: 'Product name' },
           ]}
@@ -830,17 +834,6 @@ export const ProductSearchPanel: React.FC<IProductSearchPanelProps> = ({
       <Stack horizontal tokens={{ childrenGap: 24 }}>
         <Stack tokens={{ childrenGap: 4 }} styles={{ root: { width: 280 } }}>
           <SearchableMultiSelect
-            label="Select Profile(s)"
-            required
-            options={PROFILE_OPTIONS}
-            selectedKeys={selectedProfiles}
-            onApply={setSelectedProfiles}
-            classNames={classNames}
-            theme={theme}
-          />
-        </Stack>
-        <Stack tokens={{ childrenGap: 4 }} styles={{ root: { width: 280 } }}>
-          <SearchableMultiSelect
             label="Select Tenant(s)"
             required
             options={TENANT_OPTIONS}
@@ -880,13 +873,13 @@ export const ProductSearchPanel: React.FC<IProductSearchPanelProps> = ({
         )}
         {currentStep === 'configure' && (
           <>
-            <PrimaryButton text="Add products" disabled={selectedProfiles.length === 0 || selectedTenants.length === 0} onClick={handleConfirm} />
+            <PrimaryButton text="Add products" disabled={selectedTenants.length === 0} onClick={handleConfirm} />
             <DefaultButton text="Cancel" onClick={onDismiss} />
           </>
         )}
       </Stack>
     ),
-    [currentStep, selectedIds.size, selectedProfiles.length, selectedTenants.length, onDismiss, handleConfirm]
+    [currentStep, selectedIds.size, selectedTenants.length, onDismiss, handleConfirm]
   );
 
   const renderMainContent = () => {

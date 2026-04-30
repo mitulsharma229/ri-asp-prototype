@@ -78,9 +78,10 @@ export const REGION_OPTIONS = [
 
 export const COMMITMENT_OPTIONS = [
   { key: '', text: 'Select' },
+  { key: '1 Month', text: '1 Month' },
   { key: '1 Year', text: '1 Year' },
-  { key: '3 years', text: '3 years' },
-  { key: '5 years', text: '5 years' },
+  { key: '3 Years', text: '3 Years' },
+  { key: '5 Years', text: '5 Years' },
 ];
 
 export const EMPOWERMENT_OPTIONS = [

@@ -101,7 +101,7 @@ const convertCatalogToAdded = (catalog: ICatalogProduct): IAddedProduct => {
     productFamily: catalog.productFamily,
     amendmentCode: catalog.amendmentCode,
     region: regionFromDetails || 'US West',
-    commitment: '3 years',
+    commitment: '3 Years',
     discountPercent: 0,
     startDate: 'Mar 21, 2026',
     endDate: 'Mar 21, 2029',
@@ -169,8 +169,31 @@ export const FutureProductsPage: React.FC = () => {
           updated.discountPercent = values.discountPercent;
           updated.priceNetUSD = updated.basePriceNetUSD * (1 - values.discountPercent / 100);
         }
-        if (values.startDate) updated.startDate = values.startDate.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' });
-        if (values.endDate) updated.endDate = values.endDate.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' });
+        if (values.startDatePreset === 'At order acceptance') {
+          updated.startDate = 'At order acceptance';
+        } else if (values.startDate) {
+          updated.startDate = values.startDate.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' });
+        }
+        if (values.endDateDuration) {
+          // Compute end date from duration based on the product's start date
+          const startStr = values.startDatePreset === 'At order acceptance' ? 'At order acceptance'
+            : values.startDate ? values.startDate.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' })
+            : updated.startDate;
+          const start = startStr === 'At order acceptance' ? new Date() : new Date(startStr);
+          if (!isNaN(start.getTime())) {
+            const end = new Date(start);
+            const d = values.endDateDuration;
+            if (d === '3 Months') end.setMonth(end.getMonth() + 3);
+            else if (d === '6 Months') end.setMonth(end.getMonth() + 6);
+            else if (d === '9 Months') end.setMonth(end.getMonth() + 9);
+            else if (d === '1 Year') end.setFullYear(end.getFullYear() + 1);
+            else if (d === '2 Years') end.setFullYear(end.getFullYear() + 2);
+            else if (d === '3 Years') end.setFullYear(end.getFullYear() + 3);
+            updated.endDate = end.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' });
+          }
+        } else if (values.endDate) {
+          updated.endDate = values.endDate.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' });
+        }
         return updated;
       })
     );

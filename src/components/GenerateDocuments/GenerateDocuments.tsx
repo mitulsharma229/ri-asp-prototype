@@ -40,6 +40,10 @@ const getClassNames = memoizeFunction((theme: ITheme) =>
     },
     progressSection: {
       marginTop: 16,
+      backgroundColor: theme.palette.neutralLighterAlt,
+      borderRadius: 8,
+      padding: '16px 20px',
+      border: `1px solid ${theme.palette.neutralLight}`,
     },
     progressRow: {
       padding: '6px 0',
@@ -256,7 +260,7 @@ export const GenerateDocuments: React.FC<IGenerateDocumentsProps> = ({ onComplet
           <Stack tokens={{ childrenGap: 4 }} className={classNames.progressSection}>
             <Text styles={{ root: { fontWeight: 600, fontSize: 14 } }}>CPS documents</Text>
             <Stack horizontal verticalAlign="center" tokens={{ childrenGap: 8 }}>
-              <Stack.Item grow><ProgressIndicator percentComplete={cpsProgress} styles={{ progressBar: { backgroundColor: theme.palette.themePrimary } }} /></Stack.Item>
+              <Stack.Item grow><ProgressIndicator percentComplete={cpsProgress} styles={{ progressBar: { backgroundColor: theme.palette.themePrimary }, progressTrack: { backgroundColor: theme.palette.neutralLight }, itemProgress: { borderRadius: 4, overflow: 'hidden' }, root: { padding: 0 } }} /></Stack.Item>
               <Link className={classNames.cancelLink}>
                 <Stack horizontal verticalAlign="center" tokens={{ childrenGap: 4 }}>
                   <Icon iconName="Cancel" styles={{ root: { fontSize: 12 } }} />
@@ -280,7 +284,7 @@ export const GenerateDocuments: React.FC<IGenerateDocumentsProps> = ({ onComplet
           <Stack tokens={{ childrenGap: 4 }} className={classNames.progressSection}>
             <Text styles={{ root: { fontWeight: 600, fontSize: 14 } }}>Amendment documents</Text>
             <Stack horizontal verticalAlign="center" tokens={{ childrenGap: 8 }}>
-              <Stack.Item grow><ProgressIndicator percentComplete={amendmentProgress} styles={{ progressBar: { backgroundColor: theme.palette.themePrimary } }} /></Stack.Item>
+              <Stack.Item grow><ProgressIndicator percentComplete={amendmentProgress} styles={{ progressBar: { backgroundColor: theme.palette.themePrimary }, progressTrack: { backgroundColor: theme.palette.neutralLight }, itemProgress: { borderRadius: 4, overflow: 'hidden' }, root: { padding: 0 } }} /></Stack.Item>
               <Link className={classNames.cancelLink}>
                 <Stack horizontal verticalAlign="center" tokens={{ childrenGap: 4 }}>
                   <Icon iconName="Cancel" styles={{ root: { fontSize: 12 } }} />

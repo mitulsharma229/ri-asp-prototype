@@ -27,12 +27,16 @@ const getClassNames = memoizeFunction((theme: ITheme) =>
       fontSize: 14,
     },
     digitisedBadge: {
-      backgroundColor: '#107C10',
-      color: theme.palette.white,
-      borderRadius: 4,
+      backgroundColor: '#DFF6DD',
+      color: '#107C10',
+      border: '1px solid #107C10',
+      borderRadius: 2,
       padding: '2px 8px',
       fontSize: 11,
       fontWeight: 600,
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: 4,
     },
     scenarioSection: {
       backgroundColor: theme.palette.neutralLighterAlt,
@@ -46,7 +50,7 @@ const getClassNames = memoizeFunction((theme: ITheme) =>
       height: '100%',
     },
     docPreview: {
-      flex: 55,
+      flex: 60,
       backgroundColor: '#f3f2f1',
       overflow: 'auto' as const,
       padding: 16,
@@ -76,7 +80,7 @@ const getClassNames = memoizeFunction((theme: ITheme) =>
       overflow: 'auto' as const,
     },
     editSidebar: {
-      flex: 45,
+      flex: 40,
       borderLeft: `1px solid ${theme.palette.neutralLight}`,
       overflow: 'auto' as const,
       padding: '0 24px',
@@ -158,7 +162,7 @@ export const AmendmentsView: React.FC<IAmendmentsViewProps> = ({ amendments }) =
         onRender: (item: IAmendment) => (
           <Stack horizontal verticalAlign="center" tokens={{ childrenGap: 8 }}>
             <Link onClick={() => openEdit(item)}>{item.code}</Link>
-            {item.isDigitised && <Text className={classNames.digitisedBadge}>Digitised</Text>}
+            {item.isDigitised && <span className={classNames.digitisedBadge}><Icon iconName="SkypeCircleCheck" styles={{ root: { fontSize: 10 } }} />Digitised</span>}
           </Stack>
         ),
       },
@@ -221,16 +225,22 @@ export const AmendmentsView: React.FC<IAmendmentsViewProps> = ({ amendments }) =
     [theme, classNames, openEdit, openPreview]
   );
 
-  const tableRows = React.useMemo(() =>
-    Array.from({ length: 14 }).map((_, i) => ({
-      product: `Fabric Capacity Reservation${i < 4 ? '' : ` - F${(i + 1) * 2}`}`,
-      commitment: '1',
-      discount: '3',
-      region: 'US West',
-      startDate: 'Nov 21, 2026',
-      endDate: 'Nov 21, 2027',
-    })),
-  []);
+  const tableRows = React.useMemo(() => [
+    { product: 'Fabric Capacity Reservation - Fabric Capacity - US East', commitment: '1 Year', discount: '3', region: 'US East', startDate: 'Mar 21, 2026', endDate: 'Mar 21, 2029' },
+    { product: 'Fabric Capacity Reservation - Fabric Capacity - US West', commitment: '1 Year', discount: '3', region: 'US West', startDate: 'Mar 21, 2026', endDate: 'Mar 21, 2029' },
+    { product: 'Fabric Capacity Reservation - Fabric Capacity - EU West', commitment: '3 Years', discount: '5', region: 'EU West', startDate: 'Mar 21, 2026', endDate: 'Mar 21, 2029' },
+    { product: 'SQL Database Reserved Capacity - General Purpose - US West', commitment: '1 Year', discount: '4', region: 'US West', startDate: 'Mar 21, 2026', endDate: 'Mar 21, 2027' },
+    { product: 'SQL Database Reserved Capacity - General Purpose - US East', commitment: '1 Year', discount: '4', region: 'US East', startDate: 'Mar 21, 2026', endDate: 'Mar 21, 2027' },
+    { product: 'Cosmos DB Reserved Capacity - 100 RU/s - US West', commitment: '3 Years', discount: '6', region: 'US West', startDate: 'Mar 21, 2026', endDate: 'Mar 21, 2029' },
+    { product: 'Cosmos DB Reserved Capacity - 100 RU/s - Asia Pacific', commitment: '3 Years', discount: '6', region: 'Asia Pacific', startDate: 'Mar 21, 2026', endDate: 'Mar 21, 2029' },
+    { product: 'Azure Synapse Analytics Reserved - Compute Optimized - US West', commitment: '1 Year', discount: '5', region: 'US West', startDate: 'Mar 21, 2026', endDate: 'Mar 21, 2027' },
+    { product: 'Azure Virtual Machines Reserved - D4s v5 - US West', commitment: '1 Year', discount: '3', region: 'US West', startDate: 'Mar 21, 2026', endDate: 'Mar 21, 2027' },
+    { product: 'Azure Virtual Machines Reserved - E8s v5 - Australia', commitment: '3 Years', discount: '5', region: 'Australia', startDate: 'Mar 21, 2026', endDate: 'Mar 21, 2029' },
+    { product: 'Azure Databricks Reserved - Premium - US West', commitment: '1 Year', discount: '4', region: 'US West', startDate: 'Mar 21, 2026', endDate: 'Mar 21, 2027' },
+    { product: 'Azure Cache for Redis Reserved - Standard - US West', commitment: '1 Year', discount: '3', region: 'US West', startDate: 'Mar 21, 2026', endDate: 'Mar 21, 2027' },
+    { product: 'Azure App Service Reserved - P1v3 - US East', commitment: '5 Years', discount: '8', region: 'US East', startDate: 'Mar 21, 2026', endDate: 'Mar 21, 2031' },
+    { product: 'Azure Kubernetes Service Reserved - Standard - US East', commitment: '1 Year', discount: '3', region: 'US East', startDate: 'Mar 21, 2026', endDate: 'Mar 21, 2027' },
+  ], []);
 
   const renderDocumentPreview = () => (
     <div className={classNames.docPage}>
@@ -245,7 +255,7 @@ export const AmendmentsView: React.FC<IAmendmentsViewProps> = ({ amendments }) =
       </Stack>
       <Text styles={{ root: { fontSize: 11, color: theme.palette.neutralSecondary, marginBottom: 4 } }}>&lt;Choose Enrollment&gt;</Text>
       <Text styles={{ root: { fontWeight: 600, fontSize: 13, marginBottom: 2 } }}>
-        Azure Reservations Discounting - Fabric Capacity Reservation
+        Azure RI/ASP Reservations Discounting - Fabric Capacity Reservation
       </Text>
       <Text styles={{ root: { fontSize: 11, marginBottom: 12 } }}>Amendment ID {editAmendment?.code}</Text>
       <Text styles={{ root: { fontSize: 9, color: theme.palette.neutralSecondary, marginBottom: 12, lineHeight: '14px' } }}>
@@ -264,14 +274,14 @@ export const AmendmentsView: React.FC<IAmendmentsViewProps> = ({ amendments }) =
           </tr>
         </thead>
         <tbody>
-          {tableRows.map((_, i) => (
+          {tableRows.map((row, i) => (
             <tr key={i} style={{ borderBottom: '1px solid #e1dfdd' }}>
-              <td style={{ padding: '2px 5px' }}>Fabric Capacity Reservation</td>
-              <td style={{ padding: '2px 5px' }}>1</td>
-              <td style={{ padding: '2px 5px' }}>3</td>
-              <td style={{ padding: '2px 5px' }}>US West</td>
-              <td style={{ padding: '2px 5px' }}>November 21, 2026</td>
-              <td style={{ padding: '2px 5px' }}>November 21, 2027</td>
+              <td style={{ padding: '2px 5px' }}>{row.product}</td>
+              <td style={{ padding: '2px 5px' }}>{row.commitment}</td>
+              <td style={{ padding: '2px 5px' }}>{row.discount}</td>
+              <td style={{ padding: '2px 5px' }}>{row.region}</td>
+              <td style={{ padding: '2px 5px' }}>{row.startDate}</td>
+              <td style={{ padding: '2px 5px' }}>{row.endDate}</td>
             </tr>
           ))}
         </tbody>
@@ -347,7 +357,7 @@ export const AmendmentsView: React.FC<IAmendmentsViewProps> = ({ amendments }) =
           {!isPreviewOnly && (
             <div className={classNames.editSidebar}>
               <Pivot styles={{ root: { borderBottom: `1px solid ${theme.palette.neutralLight}` } }}>
-                <PivotItem headerText="Edit Fields and tables" itemKey="fieldsAndTables">
+                <PivotItem headerText="Edit Fields" itemKey="fields">
                   <Stack tokens={{ childrenGap: 8 }} styles={{ root: { paddingTop: 16 } }}>
                     {/* Number & date format */}
                     <Stack tokens={{ childrenGap: 4 }}>
@@ -392,10 +402,11 @@ export const AmendmentsView: React.FC<IAmendmentsViewProps> = ({ amendments }) =
                         </div>
                       </Stack>
                     )}
+                  </Stack>
+                </PivotItem>
 
-                    {/* Tables section */}
-                    <Text className={classNames.fieldsLabel}>Tables</Text>
-
+                <PivotItem headerText="Edit Tables" itemKey="tables">
+                  <Stack tokens={{ childrenGap: 8 }} styles={{ root: { paddingTop: 16 } }}>
                     <div
                       className={classNames.tableCollapseHeader}
                       onClick={() => setIsTableCollapsed((prev) => !prev)}

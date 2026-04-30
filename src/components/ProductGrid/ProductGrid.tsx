@@ -10,7 +10,7 @@ import {
 import { Stack } from '@fluentui/react/lib/Stack';
 import { Text } from '@fluentui/react/lib/Text';
 import { PrimaryButton, DefaultButton, ActionButton, IconButton } from '@fluentui/react/lib/Button';
-import { Dropdown, IDropdownOption } from '@fluentui/react/lib/Dropdown';
+import { Dropdown, IDropdownOption, DropdownMenuItemType } from '@fluentui/react/lib/Dropdown';
 import { TextField } from '@fluentui/react/lib/TextField';
 import { DatePicker } from '@fluentui/react/lib/DatePicker';
 import { SearchBox } from '@fluentui/react/lib/SearchBox';
@@ -27,6 +27,42 @@ import { IAddedProduct, REGION_OPTIONS, COMMITMENT_OPTIONS } from '../../types/m
 type GridMode = 'default' | 'selected' | 'editing';
 
 const PAGE_SIZE = 15;
+
+const START_DATE_OPTIONS: IDropdownOption[] = [
+  { key: 'At order acceptance', text: 'At order acceptance' },
+  { key: 'divider', text: '-', itemType: DropdownMenuItemType.Divider },
+  { key: 'custom', text: 'Custom date...' },
+];
+
+const END_DATE_OPTIONS: IDropdownOption[] = [
+  { key: 'header', text: 'Duration', itemType: DropdownMenuItemType.Header },
+  { key: '3 Months', text: '3 Months' },
+  { key: '6 Months', text: '6 Months' },
+  { key: '9 Months', text: '9 Months' },
+  { key: '1 Year', text: '1 Year' },
+  { key: '2 Years', text: '2 Years' },
+  { key: '3 Years', text: '3 Years' },
+  { key: 'divider', text: '-', itemType: DropdownMenuItemType.Divider },
+  { key: 'custom', text: 'Custom date...' },
+];
+
+const DURATION_KEYS = new Set(['3 Months', '6 Months', '9 Months', '1 Year', '2 Years', '3 Years']);
+
+const computeEndDateFromDuration = (startDateStr: string, duration: string): string => {
+  const start = startDateStr === 'At order acceptance' ? new Date() : new Date(startDateStr);
+  if (isNaN(start.getTime())) return duration;
+  const end = new Date(start);
+  switch (duration) {
+    case '3 Months': end.setMonth(end.getMonth() + 3); break;
+    case '6 Months': end.setMonth(end.getMonth() + 6); break;
+    case '9 Months': end.setMonth(end.getMonth() + 9); break;
+    case '1 Year': end.setFullYear(end.getFullYear() + 1); break;
+    case '2 Years': end.setFullYear(end.getFullYear() + 2); break;
+    case '3 Years': end.setFullYear(end.getFullYear() + 3); break;
+    default: return duration;
+  }
+  return end.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' });
+};
 
 const getClassNames = memoizeFunction((theme: ITheme) =>
   mergeStyleSets({
@@ -127,6 +163,8 @@ export interface IBulkEditValues {
   discountPercent?: number;
   startDate?: Date;
   endDate?: Date;
+  startDatePreset?: string;
+  endDateDuration?: string;
 }
 
 export interface IProductGridProps {
@@ -163,6 +201,11 @@ export const ProductGrid: React.FC<IProductGridProps> = ({
   const [currentPage, setCurrentPage] = React.useState(0);
   const [showDetailsPanel, setShowDetailsPanel] = React.useState(false);
   const [localEdits, setLocalEdits] = React.useState<Map<string, Partial<IAddedProduct>>>(new Map());
+  // Track which items have custom date pickers open
+  const [customStartDate, setCustomStartDate] = React.useState<Set<string>>(new Set());
+  const [customEndDate, setCustomEndDate] = React.useState<Set<string>>(new Set());
+  const [bulkStartCustom, setBulkStartCustom] = React.useState(false);
+  const [bulkEndCustom, setBulkEndCustom] = React.useState(false);
 
   // Collapsed sections in details panel
   const [collapsedSections, setCollapsedSections] = React.useState<Set<string>>(new Set());
@@ -263,12 +306,16 @@ export const ProductGrid: React.FC<IProductGridProps> = ({
   const handleEnterEditMode = React.useCallback(() => {
     if (checkedIds.size > 0) {
       setLocalEdits(new Map());
+      setCustomStartDate(new Set());
+      setCustomEndDate(new Set());
       setMode('editing');
     }
   }, [checkedIds.size]);
 
   const handleDiscardChanges = React.useCallback(() => {
     setLocalEdits(new Map());
+    setCustomStartDate(new Set());
+    setCustomEndDate(new Set());
     setMode('default');
     setCheckedIds(new Set());
   }, []);
@@ -279,6 +326,7 @@ export const ProductGrid: React.FC<IProductGridProps> = ({
         onUpdateProduct(id, field as keyof IAddedProduct, value);
       });
     });
+    // Compute prices from discount
     localEdits.forEach((edits, id) => {
       if (edits.discountPercent !== undefined) {
         const product = products.find((p) => p.id === id);
@@ -288,8 +336,21 @@ export const ProductGrid: React.FC<IProductGridProps> = ({
         }
       }
     });
+    // Resolve duration-based end dates to actual dates
+    localEdits.forEach((edits, id) => {
+      if (edits.endDate && DURATION_KEYS.has(edits.endDate as string)) {
+        const product = products.find((p) => p.id === id);
+        if (product) {
+          const startDate = (edits.startDate as string) || product.startDate;
+          const resolved = computeEndDateFromDuration(startDate, edits.endDate as string);
+          onUpdateProduct(id, 'endDate', resolved);
+        }
+      }
+    });
     onSave();
     setLocalEdits(new Map());
+    setCustomStartDate(new Set());
+    setCustomEndDate(new Set());
     setMode('default');
     setCheckedIds(new Set());
   }, [localEdits, onUpdateProduct, onSave, products]);
@@ -371,19 +432,72 @@ export const ProductGrid: React.FC<IProductGridProps> = ({
         },
       },
       {
-        key: 'startDate', name: 'Start date', minWidth: 140, maxWidth: 160, isResizable: true,
+        key: 'startDate', name: 'Start date', minWidth: 170, maxWidth: 200, isResizable: true,
         onRender: (item: IAddedProduct) => {
           if (mode === 'editing' && checkedIds.has(item.id)) {
-            return <div style={cellStyle}><DatePicker value={item.startDate ? new Date(item.startDate) : undefined} onSelectDate={(date) => handleLocalEdit(item.id, 'startDate', date ? date.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }) : '')} placeholder="Start date" styles={editDatePickerStyles} /></div>;
+            const isCustom = customStartDate.has(item.id);
+            return (
+              <Stack tokens={{ childrenGap: 2 }} styles={{ root: { padding: '2px 0' } }}>
+                <Dropdown
+                  selectedKey={isCustom ? 'custom' : (item.startDate === 'At order acceptance' ? 'At order acceptance' : 'custom')}
+                  options={START_DATE_OPTIONS}
+                  onChange={(_, opt) => {
+                    if (opt?.key === 'custom') {
+                      setCustomStartDate(prev => { const n = new Set(prev); n.add(item.id); return n; });
+                      handleLocalEdit(item.id, 'startDate', '');
+                    } else {
+                      setCustomStartDate(prev => { const n = new Set(prev); n.delete(item.id); return n; });
+                      handleLocalEdit(item.id, 'startDate', opt?.key as string || '');
+                    }
+                  }}
+                  styles={editDropdownStyles}
+                />
+                {isCustom && (
+                  <DatePicker
+                    value={item.startDate && item.startDate !== 'At order acceptance' ? new Date(item.startDate) : undefined}
+                    onSelectDate={(date) => handleLocalEdit(item.id, 'startDate', date ? date.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }) : '')}
+                    placeholder="Pick a date"
+                    styles={editDatePickerStyles}
+                  />
+                )}
+              </Stack>
+            );
           }
           return <div style={cellStyle}><Text styles={{ root: { fontSize: 13 } }}>{item.startDate}</Text></div>;
         },
       },
       {
-        key: 'endDate', name: 'End date', minWidth: 140, maxWidth: 160, isResizable: true,
+        key: 'endDate', name: 'End date', minWidth: 170, maxWidth: 200, isResizable: true,
         onRender: (item: IAddedProduct) => {
           if (mode === 'editing' && checkedIds.has(item.id)) {
-            return <div style={cellStyle}><DatePicker value={item.endDate ? new Date(item.endDate) : undefined} onSelectDate={(date) => handleLocalEdit(item.id, 'endDate', date ? date.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }) : '')} placeholder="End date" styles={editDatePickerStyles} /></div>;
+            const isCustom = customEndDate.has(item.id);
+            const currentIsDuration = DURATION_KEYS.has(item.endDate);
+            return (
+              <Stack tokens={{ childrenGap: 2 }} styles={{ root: { padding: '2px 0' } }}>
+                <Dropdown
+                  selectedKey={isCustom ? 'custom' : (currentIsDuration ? item.endDate : 'custom')}
+                  options={END_DATE_OPTIONS}
+                  onChange={(_, opt) => {
+                    if (opt?.key === 'custom') {
+                      setCustomEndDate(prev => { const n = new Set(prev); n.add(item.id); return n; });
+                      handleLocalEdit(item.id, 'endDate', '');
+                    } else {
+                      setCustomEndDate(prev => { const n = new Set(prev); n.delete(item.id); return n; });
+                      handleLocalEdit(item.id, 'endDate', opt?.key as string || '');
+                    }
+                  }}
+                  styles={editDropdownStyles}
+                />
+                {isCustom && (
+                  <DatePicker
+                    value={item.endDate && !DURATION_KEYS.has(item.endDate) ? new Date(item.endDate) : undefined}
+                    onSelectDate={(date) => handleLocalEdit(item.id, 'endDate', date ? date.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }) : '')}
+                    placeholder="Pick a date"
+                    styles={editDatePickerStyles}
+                  />
+                )}
+              </Stack>
+            );
           }
           return <div style={cellStyle}><Text styles={{ root: { fontSize: 13 } }}>{item.endDate}</Text></div>;
         },
@@ -393,7 +507,7 @@ export const ProductGrid: React.FC<IProductGridProps> = ({
         onRender: (item: IAddedProduct) => <div style={cellStyle}><Text styles={{ root: { fontSize: 13 } }}>${calcPriceNet(item).toFixed(2)}</Text></div>,
       },
     ];
-  }, [checkedIds, filteredProducts, mode, handleLocalEdit, toggleCheck, toggleSelectAll]);
+  }, [checkedIds, filteredProducts, mode, handleLocalEdit, toggleCheck, toggleSelectAll, customStartDate, customEndDate]);
 
   const visibleColumns = React.useMemo(
     () => columns.filter((c) => c.key === 'checkbox' || !hiddenColumns.has(c.key)),
@@ -584,25 +698,24 @@ export const ProductGrid: React.FC<IProductGridProps> = ({
               groupProps={{ showEmptyGroups: true }}
             />
           </div>
+          {/* Pagination — inside grid area so it moves with the grid */}
+          <div className={classNames.paginationBar}>
+            <Text styles={{ root: { fontSize: 12, color: theme.palette.neutralSecondary } }}>
+              Page {currentPage + 1} of {totalPages}
+            </Text>
+            <Stack horizontal tokens={{ childrenGap: 4 }}>
+              <DefaultButton text="Previous" disabled={currentPage === 0} onClick={() => setCurrentPage((p) => Math.max(0, p - 1))} styles={{ root: { minWidth: 80 } }} />
+              <DefaultButton text="Next" disabled={currentPage >= totalPages - 1} onClick={() => setCurrentPage((p) => Math.min(totalPages - 1, p + 1))} styles={{ root: { minWidth: 80 } }} />
+            </Stack>
+          </div>
         </div>
         {renderDetailsPane()}
-      </div>
-
-      {/* Pagination — fixed at bottom */}
-      <div className={classNames.paginationBar}>
-        <Text styles={{ root: { fontSize: 12, color: theme.palette.neutralSecondary } }}>
-          Page {currentPage + 1} of {totalPages}
-        </Text>
-        <Stack horizontal tokens={{ childrenGap: 4 }}>
-          <DefaultButton text="Previous" disabled={currentPage === 0} onClick={() => setCurrentPage((p) => Math.max(0, p - 1))} styles={{ root: { minWidth: 80 } }} />
-          <DefaultButton text="Next" disabled={currentPage >= totalPages - 1} onClick={() => setCurrentPage((p) => Math.min(totalPages - 1, p + 1))} styles={{ root: { minWidth: 80 } }} />
-        </Stack>
       </div>
 
       {/* Bulk Edit Panel */}
       <Panel
         isOpen={isBulkEditOpen}
-        onDismiss={() => { setIsBulkEditOpen(false); setBulkEditValues({}); }}
+        onDismiss={() => { setIsBulkEditOpen(false); setBulkEditValues({}); setBulkStartCustom(false); setBulkEndCustom(false); }}
         type={PanelType.smallFixedFar}
         headerText="Bulk edit values"
         isFooterAtBottom
@@ -628,11 +741,43 @@ export const ProductGrid: React.FC<IProductGridProps> = ({
           </Stack>
           <Stack tokens={{ childrenGap: 4 }}>
             <Text styles={{ root: { fontWeight: 600, fontSize: 13 } }}>Start Date</Text>
-            <DatePicker placeholder="Select date" value={bulkEditValues.startDate} onSelectDate={(date) => setBulkEditValues((v) => ({ ...v, startDate: date || undefined }))} />
+            <Dropdown
+              placeholder="Select start date"
+              selectedKey={bulkStartCustom ? 'custom' : ((bulkEditValues as Record<string, unknown>).startDatePreset as string || '')}
+              options={START_DATE_OPTIONS}
+              onChange={(_, opt) => {
+                if (opt?.key === 'custom') {
+                  setBulkStartCustom(true);
+                  setBulkEditValues((v) => ({ ...v, startDate: undefined }));
+                } else {
+                  setBulkStartCustom(false);
+                  setBulkEditValues((v) => ({ ...v, startDate: undefined, startDatePreset: opt?.key as string } as IBulkEditValues));
+                }
+              }}
+            />
+            {bulkStartCustom && (
+              <DatePicker placeholder="Pick a date" value={bulkEditValues.startDate} onSelectDate={(date) => setBulkEditValues((v) => ({ ...v, startDate: date || undefined }))} />
+            )}
           </Stack>
           <Stack tokens={{ childrenGap: 4 }}>
             <Text styles={{ root: { fontWeight: 600, fontSize: 13 } }}>End Date</Text>
-            <DatePicker placeholder="Select date" value={bulkEditValues.endDate} onSelectDate={(date) => setBulkEditValues((v) => ({ ...v, endDate: date || undefined }))} />
+            <Dropdown
+              placeholder="Select end date"
+              selectedKey={bulkEndCustom ? 'custom' : ((bulkEditValues as Record<string, unknown>).endDateDuration as string || '')}
+              options={END_DATE_OPTIONS}
+              onChange={(_, opt) => {
+                if (opt?.key === 'custom') {
+                  setBulkEndCustom(true);
+                  setBulkEditValues((v) => ({ ...v, endDate: undefined }));
+                } else {
+                  setBulkEndCustom(false);
+                  setBulkEditValues((v) => ({ ...v, endDate: undefined, endDateDuration: opt?.key as string } as IBulkEditValues));
+                }
+              }}
+            />
+            {bulkEndCustom && (
+              <DatePicker placeholder="Pick a date" value={bulkEditValues.endDate} onSelectDate={(date) => setBulkEditValues((v) => ({ ...v, endDate: date || undefined }))} />
+            )}
           </Stack>
           <Text styles={{ root: { fontSize: 12, color: theme.palette.neutralSecondary, marginTop: 8 } }}>
             The input values apply only to the selected row item(s). If you do not wish to add a value in a field in bulk, you can skip it
