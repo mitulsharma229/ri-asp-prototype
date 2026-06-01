@@ -858,7 +858,7 @@ export const AmendmentsView: React.FC<IAmendmentsViewProps> = ({ amendments: ini
                     { key: 'language', name: 'Language', minWidth: 70, maxWidth: 90, onRender: (item: typeof addedAmendments[0]) => <Text styles={{ root: { fontSize: 12 } }}>{item.language}</Text> },
                     {
                       key: 'empowermentLevel', name: 'Empowerment Level', minWidth: 130, maxWidth: 150,
-                      onRender: (item: typeof addedAmendments[0], index?: number) => {
+                      onRender: (item: typeof addedAmendments[0], _index?: number) => {
                         const key = `${item.code}-${item.language}`;
                         const currentVal = addEmpowermentMap.get(key) || item.empowerment;
                         return (
@@ -929,6 +929,7 @@ export const AmendmentsView: React.FC<IAmendmentsViewProps> = ({ amendments: ini
                     modifiedOn: new Date().toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' }),
                     isDigitised: true,
                     status: 'Manual',
+                    linkedProducts: [],
                   };
                 });
                 setAmendments((prev) => [...prev, ...newAmendments]);

@@ -90,14 +90,6 @@ const parseDurationMonths = (key: string): number => {
   }
 };
 
-const getEndDateOptions = (): IDropdownOption[] => {
-  return [
-    { key: 'header', text: 'Duration', itemType: DropdownMenuItemType.Header },
-    ...ALL_DURATION_OPTIONS,
-    { key: 'divider', text: '-', itemType: DropdownMenuItemType.Divider },
-    { key: 'custom', text: 'On specific date' },
-  ];
-};
 
 const getClassNames = memoizeFunction((theme: ITheme) =>
   mergeStyleSets({
@@ -609,7 +601,6 @@ export const ProductGrid: React.FC<IProductGridProps> = ({
   const cellStyle: React.CSSProperties = { minHeight: 36, display: 'flex', alignItems: 'center' };
   const editDropdownStyles = { root: { width: '100%' }, dropdown: { minWidth: 0, height: 32 } };
   const editTextFieldStyles = { root: { width: '100%' }, fieldGroup: { height: 32 } };
-  const editDatePickerStyles = { root: { width: '100%' }, textField: { fieldGroup: { height: 32 } } };
 
   const columns: IColumn[] = React.useMemo(() => {
     const allChecked = filteredProducts.length > 0 && filteredProducts.every((p) => checkedIds.has(p.id));

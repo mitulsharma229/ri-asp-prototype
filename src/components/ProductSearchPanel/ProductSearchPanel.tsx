@@ -36,19 +36,6 @@ const PRODUCT_FAMILY_FILTER_OPTIONS: IDropdownOption[] = [
   { key: 'Azure Storage', text: 'Azure Storage' },
   { key: 'Azure Networking', text: 'Azure Networking' },
 ];
-const REGION_FILTER_OPTIONS: IDropdownOption[] = [
-  { key: 'All', text: 'All' },
-  { key: 'US North', text: 'US North' },
-  { key: 'US South', text: 'US South' },
-  { key: 'US East', text: 'US East' },
-  { key: 'US West', text: 'US West' },
-  { key: 'US Central', text: 'US Central' },
-  { key: 'EU West', text: 'EU West' },
-  { key: 'EU North', text: 'EU North' },
-  { key: 'Japan', text: 'Japan' },
-  { key: 'India', text: 'India' },
-  { key: 'Australia', text: 'Australia' },
-];
 const METER_FILTER_OPTIONS: IDropdownOption[] = [
   { key: 'All', text: 'All' },
   { key: 'vCPU', text: 'vCPU' },
