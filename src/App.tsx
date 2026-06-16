@@ -1,5 +1,7 @@
 import { ThemeProvider, createTheme } from '@fluentui/react';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { FutureProductsPage } from './pages/FutureProductsPage';
+import { SkuConfigWorkflow } from './components/SkuConfigWorkflow/SkuConfigWorkflow';
 
 const appTheme = createTheme({
   palette: {
@@ -16,7 +18,12 @@ const appTheme = createTheme({
 function App() {
   return (
     <ThemeProvider theme={appTheme}>
-      <FutureProductsPage />
+      <BrowserRouter basename="/ri-asp-prototype">
+        <Routes>
+          <Route path="/" element={<FutureProductsPage />} />
+          <Route path="/sku-config" element={<SkuConfigWorkflow />} />
+        </Routes>
+      </BrowserRouter>
     </ThemeProvider>
   );
 }

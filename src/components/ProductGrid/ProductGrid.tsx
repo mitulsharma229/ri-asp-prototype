@@ -6,6 +6,7 @@ import {
   CheckboxVisibility,
   DetailsListLayoutMode,
   IGroup,
+  CollapseAllVisibility,
 } from '@fluentui/react/lib/DetailsList';
 import { Stack } from '@fluentui/react/lib/Stack';
 import { Text } from '@fluentui/react/lib/Text';
@@ -24,7 +25,9 @@ import { Icon } from '@fluentui/react/lib/Icon';
 import { useTheme, ITheme } from '@fluentui/react';
 import { mergeStyleSets } from '@fluentui/merge-styles';
 import { memoizeFunction } from '@fluentui/utilities';
-import { IAddedProduct, REGION_GROUPS, COMMITMENT_OPTIONS, TENANT_OPTIONS } from '../../types/models';
+import { IAddedProduct, ISku, REGION_GROUPS, COMMITMENT_OPTIONS, TENANT_OPTIONS } from '../../types/models';
+import { Link } from '@fluentui/react/lib/Link';
+import { MessageBar, MessageBarType } from '@fluentui/react/lib/MessageBar';
 
 type GridMode = 'default' | 'selected' | 'editing';
 
@@ -107,14 +110,13 @@ const getClassNames = memoizeFunction((theme: ITheme) =>
     },
     gridArea: {
       flex: 1,
-      overflow: 'hidden' as const,
+      overflowY: 'hidden' as const,
       padding: '0 16px',
       display: 'flex',
       flexDirection: 'column' as const,
     },
     tableWrapper: {
       flex: 1,
-      overflowX: 'hidden' as const,
       overflowY: 'auto' as const,
       position: 'relative' as const,
     },
@@ -382,7 +384,7 @@ export const ProductGrid: React.FC<IProductGridProps> = ({
   const [isBulkEditOpen, setIsBulkEditOpen] = React.useState(false);
   const [bulkEditValues, setBulkEditValues] = React.useState<IBulkEditValues>({});
   const [isColumnsCalloutOpen, setIsColumnsCalloutOpen] = React.useState(false);
-  const [hiddenColumns, setHiddenColumns] = React.useState<Set<string>>(new Set(['productType', 'partNumber', 'status']));
+  const [hiddenColumns, setHiddenColumns] = React.useState<Set<string>>(new Set(['productFamily', 'productType', 'partNumber', 'status']));
   const [currentPage, setCurrentPage] = React.useState(0);
   const [showDetailsPanel, setShowDetailsPanel] = React.useState(false);
   const [localEdits, setLocalEdits] = React.useState<Map<string, Partial<IAddedProduct>>>(new Map());
@@ -425,6 +427,116 @@ export const ProductGrid: React.FC<IProductGridProps> = ({
 
   const columnsBtnRef = React.useRef<HTMLDivElement>(null);
   const filterBtnRef = React.useRef<HTMLDivElement>(null);
+
+  // Edit SKUs state
+  const [editSkuProductId, setEditSkuProductId] = React.useState<string | null>(null);
+  const [skuChecked, setSkuChecked] = React.useState<Set<string>>(new Set());
+  const [skuEdits, setSkuEdits] = React.useState<Map<string, Partial<ISku>>>(new Map());
+  const [skuInitialEdits, setSkuInitialEdits] = React.useState<Map<string, Partial<ISku>>>(new Map());
+  const [skuStartDateCalendarOpen, setSkuStartDateCalendarOpen] = React.useState<string | null>(null);
+  const [skuEndDateCalendarOpen, setSkuEndDateCalendarOpen] = React.useState<string | null>(null);
+  const skuStartDateRefs = React.useRef<Map<string, HTMLElement>>(new Map());
+  const skuEndDateRefs = React.useRef<Map<string, HTMLElement>>(new Map());
+
+  // SKU reset warning state
+  const [skuResetWarningOpen, setSkuResetWarningOpen] = React.useState(false);
+  const [skuResetProductIds, setSkuResetProductIds] = React.useState<string[]>([]);
+  const [pendingEditsOnWarning, setPendingEditsOnWarning] = React.useState<Map<string, Partial<IAddedProduct>>>(new Map());
+  const [pendingBulkEditOnWarning, setPendingBulkEditOnWarning] = React.useState<{ ids: string[]; values: IBulkEditValues } | null>(null);
+
+  const editSkuProduct = products.find((p) => p.id === editSkuProductId);
+
+  const skuDropdownStyles = { root: { width: 140 }, dropdown: { minWidth: 0, borderColor: '#c8c6c4' }, dropdownItem: { fontSize: 12 }, dropdownItemSelected: { fontSize: 12 }, title: { fontSize: 12, height: 28, lineHeight: '26px', padding: '0 28px 0 8px', borderColor: '#c8c6c4' }, caretDownWrapper: { height: 28, lineHeight: '28px' } };
+
+  const SKU_START_DATE_OPTIONS: IDropdownOption[] = [
+    { key: 'At order acceptance', text: 'At order acceptance' },
+    { key: 'divider', text: '-', itemType: DropdownMenuItemType.Divider },
+    { key: 'On specific date', text: 'On specific date' },
+  ];
+  const skuEndDateOptions: IDropdownOption[] = React.useMemo(() => {
+    const commitment = editSkuProduct?.commitment || '';
+    const filtered = ALL_DURATION_OPTIONS.filter((d) => {
+      if (!commitment) return true;
+      const months = parseDurationMonths(d.key);
+      if (commitment === '1 Year') return months <= 12;
+      if (commitment === '3 Years') return months <= 36;
+      return true;
+    });
+    return [
+      { key: 'header', text: 'Duration', itemType: DropdownMenuItemType.Header },
+      ...filtered.map((d) => ({ key: d.key, text: d.text })),
+      { key: 'divider', text: '-', itemType: DropdownMenuItemType.Divider },
+      { key: 'On specific date', text: 'On specific date' },
+    ];
+  }, [editSkuProduct?.commitment]);
+
+  const skusByRegion: Map<string, ISku[]> = React.useMemo(() => {
+    if (!editSkuProduct || !editSkuProduct.skus) return new Map();
+    const regionMap = new Map<string, ISku[]>();
+    editSkuProduct.skus.forEach((sku) => {
+      if (!regionMap.has(sku.region)) regionMap.set(sku.region, []);
+      regionMap.get(sku.region)!.push(sku);
+    });
+    return regionMap;
+  }, [editSkuProduct]);
+
+  const skuHasEdits = React.useMemo(() => {
+    if (!editSkuProduct || !editSkuProduct.skus) return false;
+    for (const sku of editSkuProduct.skus) {
+      const edit = skuEdits.get(sku.id);
+      const initial = skuInitialEdits.get(sku.id);
+      if (!edit || !initial) continue;
+      if (edit.discountPercent !== initial.discountPercent || edit.startDate !== initial.startDate || edit.endDate !== initial.endDate) return true;
+    }
+    return false;
+  }, [editSkuProduct, skuEdits, skuInitialEdits]);
+
+  const handleOpenEditSkus = (productId: string) => {
+    const product = products.find((p) => p.id === productId);
+    if (!product || !product.skus || product.skus.length === 0) return;
+    setEditSkuProductId(productId);
+    setSkuChecked(new Set(product.selectedSkuIds || []));
+    const edits = new Map<string, Partial<ISku>>();
+    product.skus.forEach((sku) => {
+      edits.set(sku.id, {
+        discountPercent: sku.discountPercent !== 0 ? sku.discountPercent : product.discountPercent,
+        startDate: sku.startDate !== 'Mar 21, 2026' ? sku.startDate : product.startDate,
+        endDate: sku.endDate !== 'Mar 21, 2029' ? sku.endDate : product.endDate,
+      });
+    });
+    setSkuEdits(edits);
+    setSkuInitialEdits(new Map(edits));
+  };
+
+  const handleSkuApply = () => {
+    if (!editSkuProductId || !editSkuProduct) return;
+    const updatedSkus = (editSkuProduct.skus || []).map((sku) => {
+      const edit = skuEdits.get(sku.id);
+      if (!edit) return sku;
+      return { ...sku, ...edit };
+    });
+    onUpdateProduct(editSkuProductId, 'skus', updatedSkus);
+    onUpdateProduct(editSkuProductId, 'selectedSkuIds', Array.from(skuChecked));
+    setEditSkuProductId(null);
+  };
+
+  const handleSkuResetToDefault = () => {
+    if (!editSkuProduct) return;
+    const edits = new Map<string, Partial<ISku>>();
+    (editSkuProduct.skus || []).forEach((sku) => {
+      edits.set(sku.id, { discountPercent: editSkuProduct.discountPercent, startDate: editSkuProduct.startDate, endDate: editSkuProduct.endDate });
+    });
+    setSkuEdits(edits);
+  };
+
+  const handleSkuEdit = (skuId: string, field: keyof ISku, value: string | number) => {
+    setSkuEdits((prev) => {
+      const next = new Map(prev);
+      const existing = next.get(skuId) || {};
+      next.set(skuId, { ...existing, [field]: value });
+      return next;
+    });
+  };
 
   const hasChecked = checkedIds.size > 0;
 
@@ -535,7 +647,39 @@ export const ProductGrid: React.FC<IProductGridProps> = ({
     setCheckedIds(new Set());
   }, []);
 
+  const detectSkuResets = (edits: Map<string, Partial<IAddedProduct>>): { hasResets: boolean; productIds: string[] } => {
+    const resetProducts: string[] = [];
+    edits.forEach((edits, productId) => {
+      const product = products.find((p) => p.id === productId);
+      if (!product || !product.selectedSkuIds || product.selectedSkuIds.length === 0) return;
+
+      const regionsEdited = edits.regions !== undefined;
+      const commitmentEdited = edits.commitment !== undefined;
+
+      if (!regionsEdited && !commitmentEdited) return;
+
+      const newRegions = regionsEdited ? (edits.regions as string[]) : product.regions;
+      const newCommitment = commitmentEdited ? (edits.commitment as string) : product.commitment;
+
+      const regionsChanged = regionsEdited && JSON.stringify(newRegions) !== JSON.stringify(product.regions);
+      const commitmentChanged = commitmentEdited && newCommitment !== product.commitment;
+
+      if (regionsChanged || commitmentChanged) {
+        resetProducts.push(productId);
+      }
+    });
+    return { hasResets: resetProducts.length > 0, productIds: resetProducts };
+  };
+
   const handleSaveAndExit = React.useCallback(() => {
+    const { hasResets, productIds } = detectSkuResets(localEdits);
+    if (hasResets) {
+      setSkuResetWarningOpen(true);
+      setSkuResetProductIds(productIds);
+      setPendingEditsOnWarning(new Map(localEdits));
+      return;
+    }
+
     localEdits.forEach((edits, id) => {
       Object.entries(edits).forEach(([field, value]) => {
         onUpdateProduct(id, field as keyof IAddedProduct, value);
@@ -579,12 +723,103 @@ export const ProductGrid: React.FC<IProductGridProps> = ({
   }, [checkedIds, onDeleteProducts]);
 
   const handleBulkEditApply = React.useCallback(() => {
+    // Check for SKU resets from regions or commitment changes
+    if ((bulkEditValues.regions || bulkEditValues.commitment)) {
+      const affectedProducts = Array.from(checkedIds).filter((id) => {
+        const product = products.find((p) => p.id === id);
+        return product && product.selectedSkuIds && product.selectedSkuIds.length > 0;
+      });
+      if (affectedProducts.length > 0) {
+        setSkuResetWarningOpen(true);
+        setSkuResetProductIds(affectedProducts);
+        setPendingBulkEditOnWarning({ ids: Array.from(checkedIds), values: bulkEditValues });
+        return;
+      }
+    }
     onBulkEditApply(Array.from(checkedIds), bulkEditValues);
     setIsBulkEditOpen(false);
     setBulkEditValues({});
     setCheckedIds(new Set());
     setMode('default');
-  }, [checkedIds, bulkEditValues, onBulkEditApply]);
+  }, [checkedIds, bulkEditValues, onBulkEditApply, products]);
+
+  const handleSkuResetContinue = React.useCallback(() => {
+    setSkuResetWarningOpen(false);
+    if (pendingBulkEditOnWarning) {
+      // Handle bulk edit
+      onBulkEditApply(pendingBulkEditOnWarning.ids, pendingBulkEditOnWarning.values);
+      setIsBulkEditOpen(false);
+      setBulkEditValues({});
+      setCheckedIds(new Set());
+      setMode('default');
+      setPendingBulkEditOnWarning(null);
+    } else {
+      // Handle inline edit
+      pendingEditsOnWarning.forEach((edits, id) => {
+        Object.entries(edits).forEach(([field, value]) => {
+          onUpdateProduct(id, field as keyof IAddedProduct, value);
+        });
+      });
+      // Compute prices from discount
+      pendingEditsOnWarning.forEach((edits, id) => {
+        if (edits.discountPercent !== undefined) {
+          const product = products.find((p) => p.id === id);
+          if (product) {
+            const newPrice = product.basePriceNetUSD * (1 - (edits.discountPercent as number) / 100);
+            onUpdateProduct(id, 'priceNetUSD', newPrice);
+          }
+        }
+      });
+      // Resolve duration-based end dates to actual dates
+      pendingEditsOnWarning.forEach((edits, id) => {
+        if (edits.endDate && DURATION_KEYS.has(edits.endDate as string)) {
+          const product = products.find((p) => p.id === id);
+          if (product) {
+            const startDate = (edits.startDate as string) || product.startDate;
+            const resolved = computeEndDateFromDuration(startDate, edits.endDate as string);
+            onUpdateProduct(id, 'endDate', resolved);
+          }
+        }
+      });
+      onSave();
+      setLocalEdits(new Map());
+      setCustomStartDate(new Set());
+      setCustomEndDate(new Set());
+      setMode('default');
+      setCheckedIds(new Set());
+    }
+    setPendingEditsOnWarning(new Map());
+    setSkuResetProductIds([]);
+  }, [pendingEditsOnWarning, pendingBulkEditOnWarning, onUpdateProduct, onBulkEditApply, onSave, products]);
+
+  const handleSkuResetCancel = React.useCallback(() => {
+    setSkuResetWarningOpen(false);
+    if (pendingBulkEditOnWarning) {
+      // For bulk edit, just close the dialog and clear the pending values
+      setPendingBulkEditOnWarning(null);
+    } else {
+      // For inline edit, revert only the SKU-affecting edits (regions and commitment)
+      setLocalEdits((prev) => {
+        const next = new Map(prev);
+        skuResetProductIds.forEach((productId) => {
+          const edits = next.get(productId);
+          if (edits) {
+            const reverted = { ...edits };
+            delete reverted.regions;
+            delete reverted.commitment;
+            if (Object.keys(reverted).length === 0) {
+              next.delete(productId);
+            } else {
+              next.set(productId, reverted);
+            }
+          }
+        });
+        return next;
+      });
+    }
+    setPendingEditsOnWarning(new Map());
+    setSkuResetProductIds([]);
+  }, [skuResetProductIds, pendingBulkEditOnWarning]);
 
   const calcPriceNet = (item: IAddedProduct): number => {
     return item.basePriceNetUSD * (1 - item.discountPercent / 100);
@@ -607,15 +842,40 @@ export const ProductGrid: React.FC<IProductGridProps> = ({
     return [
       {
         key: 'checkbox', name: '', minWidth: 32, maxWidth: 32,
-        onRenderHeader: () => <Checkbox checked={allChecked} onChange={toggleSelectAll} styles={{ root: { marginLeft: 4 } }} />,
-        onRender: (item: IAddedProduct) => <Checkbox checked={checkedIds.has(item.id)} onChange={() => toggleCheck(item.id)} />,
+        onRenderHeader: () => <Checkbox checked={allChecked} onChange={toggleSelectAll} styles={{ root: { paddingLeft: 0 } }} />,
+        onRender: (item: IAddedProduct) => <Checkbox checked={checkedIds.has(item.id)} onChange={() => toggleCheck(item.id)} styles={{ root: { paddingLeft: 0 } }} />,
       },
       {
-        key: 'productDetails', name: 'Product description', minWidth: 140, maxWidth: 200, isResizable: true,
-        onRender: (item: IAddedProduct) => <div style={cellStyle}><Text styles={{ root: { fontSize: 13, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block' } }}>{item.productDetails}</Text></div>,
+        key: 'productDetails', name: 'Product description', minWidth: 260, maxWidth: 340, isResizable: true,
+        onRender: (item: IAddedProduct) => {
+          const skuDiffers = item.selectedSkuIds && item.selectedSkuIds.length > 0 && item.skus && item.skus.some((sku) =>
+            sku.discountPercent !== item.discountPercent || sku.startDate !== item.startDate || sku.endDate !== item.endDate
+          );
+          return (
+            <div style={cellStyle}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <Text styles={{ root: { fontSize: 13, whiteSpace: 'normal', wordBreak: 'break-word', lineHeight: '18px' } }}>{item.productDetails}</Text>
+                  {skuDiffers && (
+                    <TooltipHost content="Some SKU values differ from those set for the parent product." calloutProps={{ gapSpace: 4 }}>
+                      <Icon iconName="Warning" styles={{ root: { fontSize: 14, color: '#d83b01', flexShrink: 0 } }} />
+                    </TooltipHost>
+                  )}
+                </div>
+                <Link
+                  onClick={() => handleOpenEditSkus(item.id)}
+                  disabled={!item.skus || item.skus.length === 0}
+                  styles={{ root: { fontSize: 11, color: item.skus && item.skus.length > 0 ? theme.palette.themePrimary : theme.palette.neutralTertiary } }}
+                >
+                  Edit SKUs
+                </Link>
+              </div>
+            </div>
+          );
+        },
       },
       {
-        key: 'tenants', name: 'Tenant(s)', minWidth: 110, maxWidth: 150, isResizable: true,
+        key: 'tenants', name: 'Tenant(s)', minWidth: 170, maxWidth: 220, isResizable: true,
         onRender: (item: IAddedProduct) => {
           const names = (item.tenants || []).map((key) => {
             const opt = TENANT_OPTIONS.find((t) => t.key === key);
@@ -624,23 +884,28 @@ export const ProductGrid: React.FC<IProductGridProps> = ({
           if (names.length === 0) {
             return <div style={cellStyle}><Text styles={{ root: { fontSize: 12, color: theme.palette.neutralTertiary } }}>—</Text></div>;
           }
-          if (names.length <= 2) {
-            return <div style={cellStyle}><Text styles={{ root: { fontSize: 12, whiteSpace: 'nowrap' } }}>{names.join(', ')}</Text></div>;
-          }
+          const maxShow = 2;
+          const shown = names.slice(0, maxShow);
+          const extra = names.length - maxShow;
           return (
-            <div style={cellStyle}>
-              <TooltipHost content={<div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>{names.map((n, i) => <span key={i}>{n}</span>)}</div>} calloutProps={{ gapSpace: 4 }}>
-                <span style={{ whiteSpace: 'nowrap', fontSize: 12 }}>
-                  {names[0]}, {names[1]}{' '}
-                  <span style={{ backgroundColor: theme.palette.neutralLight, borderRadius: 10, padding: '1px 6px', fontSize: 11, color: theme.palette.neutralDark }}>+{names.length - 2}</span>
-                </span>
-              </TooltipHost>
+            <div style={{ ...cellStyle, overflow: 'hidden', width: '100%' }}>
+              <span style={{ fontSize: 12, lineHeight: '18px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {shown.join(', ')}
+                {extra > 0 && (
+                  <>
+                    {', '}
+                    <TooltipHost content={<div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>{names.map((n, i) => <span key={i}>{n}</span>)}</div>} calloutProps={{ gapSpace: 4, directionalHint: DirectionalHint.bottomCenter }}>
+                      <span style={{ color: theme.palette.themePrimary, fontWeight: 600, cursor: 'pointer' }}>+{extra}</span>
+                    </TooltipHost>
+                  </>
+                )}
+              </span>
             </div>
           );
         },
       },
       {
-        key: 'regions', name: 'Region', minWidth: 120, maxWidth: 170, isResizable: true,
+        key: 'regions', name: 'Region', minWidth: 160, maxWidth: 200, isResizable: true,
         onRender: (item: IAddedProduct) => {
           if (mode === 'editing' && checkedIds.has(item.id)) {
             return (
@@ -657,23 +922,28 @@ export const ProductGrid: React.FC<IProductGridProps> = ({
           if (regions.length === 0) {
             return <div style={cellStyle}><Text styles={{ root: { fontSize: 12, color: theme.palette.neutralTertiary } }}>—</Text></div>;
           }
-          if (regions.length <= 2) {
-            return <div style={cellStyle}><Text styles={{ root: { fontSize: 12, whiteSpace: 'nowrap' } }}>{regions.join(', ')}</Text></div>;
-          }
+          const maxShow = 2;
+          const shown = regions.slice(0, maxShow);
+          const extra = regions.length - maxShow;
           return (
-            <div style={cellStyle}>
-              <TooltipHost content={<div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>{regions.map((r, i) => <span key={i}>{r}</span>)}</div>} calloutProps={{ gapSpace: 4 }}>
-                <span style={{ whiteSpace: 'nowrap', fontSize: 12 }}>
-                  {regions[0]}, {regions[1]}{' '}
-                  <span style={{ backgroundColor: theme.palette.neutralLight, borderRadius: 10, padding: '1px 6px', fontSize: 11, color: theme.palette.neutralDark }}>+{regions.length - 2}</span>
-                </span>
-              </TooltipHost>
+            <div style={{ ...cellStyle, overflow: 'hidden', width: '100%' }}>
+              <span style={{ fontSize: 12, lineHeight: '18px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {shown.join(', ')}
+                {extra > 0 && (
+                  <>
+                    {', '}
+                    <TooltipHost content={<div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>{regions.map((r, i) => <span key={i}>{r}</span>)}</div>} calloutProps={{ gapSpace: 4, directionalHint: DirectionalHint.bottomCenter }}>
+                      <span style={{ color: theme.palette.themePrimary, fontWeight: 600, cursor: 'pointer' }}>+{extra}</span>
+                    </TooltipHost>
+                  </>
+                )}
+              </span>
             </div>
           );
         },
       },
       {
-        key: 'commitment', name: 'Commitment Duration', minWidth: 120, maxWidth: 150, isResizable: true,
+        key: 'commitment', name: 'Commitment Duration', minWidth: 140, maxWidth: 180, isResizable: true,
         onRender: (item: IAddedProduct) => {
           if (mode === 'editing' && checkedIds.has(item.id)) {
             return (
@@ -692,7 +962,7 @@ export const ProductGrid: React.FC<IProductGridProps> = ({
         },
       },
       {
-        key: 'discountPercent', name: 'Discount (%)', minWidth: 75, maxWidth: 90, isResizable: true,
+        key: 'discountPercent', name: 'Discount (%)', minWidth: 100, maxWidth: 120, isResizable: true,
         onRender: (item: IAddedProduct) => {
           if (mode === 'editing' && checkedIds.has(item.id)) {
             return <div style={cellStyle}><TextField value={String(item.discountPercent)} onChange={(_, val) => { const num = parseFloat(val || '0'); if (!isNaN(num) && num >= 0 && num <= 100) handleLocalEdit(item.id, 'discountPercent', num); }} placeholder="Discount %" styles={editTextFieldStyles} /></div>;
@@ -701,7 +971,7 @@ export const ProductGrid: React.FC<IProductGridProps> = ({
         },
       },
       {
-        key: 'startDate', name: 'Start date', minWidth: 120, maxWidth: 150, isResizable: true,
+        key: 'startDate', name: 'Start date', minWidth: 130, maxWidth: 160, isResizable: true,
         onRender: (item: IAddedProduct) => {
           if (mode === 'editing' && checkedIds.has(item.id)) {
             const showPicker = customStartDate.has(item.id);
@@ -764,7 +1034,7 @@ export const ProductGrid: React.FC<IProductGridProps> = ({
         },
       },
       {
-        key: 'endDate', name: 'End date', minWidth: 120, maxWidth: 150, isResizable: true,
+        key: 'endDate', name: 'End date', minWidth: 130, maxWidth: 160, isResizable: true,
         onRender: (item: IAddedProduct) => {
           if (mode === 'editing' && checkedIds.has(item.id)) {
             const showPicker = customEndDate.has(item.id);
@@ -837,8 +1107,28 @@ export const ProductGrid: React.FC<IProductGridProps> = ({
         },
       },
       {
-        key: 'priceNetUSD', name: 'Price Net (USD)', minWidth: 90, maxWidth: 110, isResizable: true,
-        onRender: (item: IAddedProduct) => <div style={cellStyle}><Text styles={{ root: { fontSize: 13 } }}>${calcPriceNet(item).toFixed(2)}</Text></div>,
+        key: 'productFamily', name: 'Product Family', minWidth: 140, maxWidth: 180, isResizable: true,
+        onRender: (item: IAddedProduct) => (
+          <div style={cellStyle}><Text styles={{ root: { fontSize: 13, color: theme.palette.neutralSecondary } }}>{item.productFamily || 'N/A'}</Text></div>
+        ),
+      },
+      {
+        key: 'productType', name: 'Product Type', minWidth: 120, maxWidth: 160, isResizable: true,
+        onRender: () => (
+          <div style={cellStyle}><Text styles={{ root: { fontSize: 13, color: theme.palette.neutralSecondary } }}>MSU</Text></div>
+        ),
+      },
+      {
+        key: 'partNumber', name: 'Part Number', minWidth: 120, maxWidth: 160, isResizable: true,
+        onRender: (item: IAddedProduct) => (
+          <div style={cellStyle}><Text styles={{ root: { fontSize: 13, color: theme.palette.neutralSecondary } }}>{item.partNumber || 'N/A'}</Text></div>
+        ),
+      },
+      {
+        key: 'status', name: 'Status', minWidth: 100, maxWidth: 130, isResizable: true,
+        onRender: () => (
+          <div style={cellStyle}><Text styles={{ root: { fontSize: 13, color: theme.palette.neutralSecondary } }}>Active</Text></div>
+        ),
       },
     ];
   }, [checkedIds, filteredProducts, mode, handleLocalEdit, toggleCheck, toggleSelectAll, customStartDate, customEndDate, availableTenants]);
@@ -848,14 +1138,16 @@ export const ProductGrid: React.FC<IProductGridProps> = ({
     [columns, hiddenColumns]
   );
 
-  const allColumnKeys = ['productDetails', 'productFamily', 'tenants', 'regions', 'commitment', 'discountPercent', 'startDate', 'endDate', 'priceNetUSD', 'productType', 'partNumber', 'status'];
+  const allColumnKeys = ['productDetails', 'productFamily', 'tenants', 'regions', 'commitment', 'discountPercent', 'startDate', 'endDate', 'productType', 'partNumber', 'status'];
   const columnLabels: Record<string, string> = {
     productDetails: 'Product description', productFamily: 'Product Family', tenants: 'Tenant(s)', regions: 'Region(s)',
     commitment: 'Commitment Duration', discountPercent: 'Discount (%)', startDate: 'Start date',
-    endDate: 'End date', priceNetUSD: 'Price Net (USD)', productType: 'Product Type', partNumber: 'Part Number', status: 'Status',
+    endDate: 'End date', productType: 'Product Type', partNumber: 'Part Number', status: 'Status',
   };
 
   const hasActiveFilter = appliedFilterChips.size > 0;
+  const extraColumns = ['productFamily', 'productType', 'partNumber', 'status'];
+  const hasExtraColumnsVisible = extraColumns.some((k) => !hiddenColumns.has(k));
 
   const openFilterPanel = React.useCallback(() => {
     setPendingProductType(productTypeFilter);
@@ -916,7 +1208,7 @@ export const ProductGrid: React.FC<IProductGridProps> = ({
       <Stack horizontal verticalAlign="center" className={classNames.toolbar} tokens={{ childrenGap: 4 }}>
         <ActionButton iconProps={{ iconName: 'Add' }} text="Add RI/ASP Products" onClick={onAddProducts} />
         <ActionButton iconProps={{ iconName: 'Edit' }} text="Edit" disabled={!hasChecked} onClick={handleEnterEditMode} />
-        <ActionButton iconProps={{ iconName: 'BulkUpload' }} text="Bulk Edit" disabled={!hasChecked} onClick={() => setIsBulkEditOpen(true)} />
+        <ActionButton iconProps={{ iconName: 'BulkUpload' }} text="Bulk Edit" disabled={checkedIds.size < 2} onClick={() => setIsBulkEditOpen(true)} />
         <ActionButton iconProps={{ iconName: 'Copy' }} text="Duplicate" disabled={!hasChecked} onClick={() => onDuplicateProducts?.(Array.from(checkedIds))} />
         <ActionButton iconProps={{ iconName: 'Delete' }} text="Delete" disabled={!hasChecked} onClick={() => setDeleteDialogHidden(false)} />
         <Stack.Item grow={1}><span /></Stack.Item>
@@ -965,7 +1257,6 @@ export const ProductGrid: React.FC<IProductGridProps> = ({
           <Text styles={{ root: { fontSize: 13, color: theme.palette.neutralSecondary, display: 'block', marginTop: 4 } }}>
             {selectedDetailItem.productDetails}
           </Text>
-          <div className={classNames.summaryTab}>Summary</div>
         </div>
 
         <div className={classNames.detailsPanelBody} style={{ flex: 1, overflowY: 'auto' }}>
@@ -1003,16 +1294,24 @@ export const ProductGrid: React.FC<IProductGridProps> = ({
           </div>
           {!collapsedSections.has('configuredSkus') && (
             <div style={{ padding: '4px 12px' }}>
-              {(selectedDetailItem.regions || ['US West']).map((region, i) => (
-                <div key={i} style={{ padding: '4px 0', borderBottom: `1px solid ${theme.palette.neutralLighter}` }}>
-                  <Text styles={{ root: { fontSize: 12, color: theme.palette.neutralPrimary } }}>
-                    {region}, {selectedDetailItem.commitment || '3 Years'}
-                  </Text>
-                  <Text styles={{ root: { fontSize: 11, color: theme.palette.neutralSecondary, display: 'block' } }}>
-                    {selectedDetailItem.productDetails}
-                  </Text>
-                </div>
-              ))}
+              {selectedDetailItem.selectedSkuIds && selectedDetailItem.selectedSkuIds.length > 0 && selectedDetailItem.skus ? (
+                selectedDetailItem.skus
+                  .filter((sku) => selectedDetailItem.selectedSkuIds!.includes(sku.id))
+                  .map((sku) => (
+                    <div key={sku.id} style={{ padding: '4px 0', borderBottom: `1px solid ${theme.palette.neutralLighter}` }}>
+                      <Text styles={{ root: { fontSize: 12, color: theme.palette.neutralPrimary } }}>
+                        {sku.skuType}, {sku.region}, {sku.commitment}
+                      </Text>
+                      <Text styles={{ root: { fontSize: 11, color: theme.palette.neutralSecondary, display: 'block' } }}>
+                        {sku.discountPercent}% discount, Starts {sku.startDate} until {sku.endDate}
+                      </Text>
+                    </div>
+                  ))
+              ) : (
+                <Text styles={{ root: { fontSize: 12, color: theme.palette.neutralSecondary, fontStyle: 'italic' } }}>
+                  Please add region and commitment values to the product to proceed with configuring the SKUs
+                </Text>
+              )}
             </div>
           )}
 
@@ -1377,28 +1676,33 @@ export const ProductGrid: React.FC<IProductGridProps> = ({
       {/* Grid + Details pane — this is the scrollable area */}
       <div className={classNames.gridAndDetailsWrapper}>
         <div className={classNames.gridArea}>
-          <div className={classNames.tableWrapper}>
+          <style>{`
+            .grid-align-fix [role="columnheader"][data-is-focusable="false"]:empty {
+              display: none !important;
+            }
+          `}</style>
+          <div className={`${classNames.tableWrapper} grid-align-fix`} style={{ overflowX: hasExtraColumnsVisible ? 'auto' : 'hidden' }}>
             <DetailsList
               items={sortedItems}
               columns={visibleColumns}
               groups={groups}
+              indentWidth={0}
               selectionMode={SelectionMode.none}
               checkboxVisibility={CheckboxVisibility.hidden}
-              layoutMode={DetailsListLayoutMode.justified}
+              layoutMode={hasExtraColumnsVisible ? DetailsListLayoutMode.fixedColumns : DetailsListLayoutMode.justified}
               getKey={(item) => (item as IAddedProduct).id}
               onRenderRow={(props, defaultRender) => {
                 if (!props || !defaultRender) return null;
-                return defaultRender({ ...props, styles: { root: { minHeight: 42 }, cell: { minHeight: 42, alignSelf: 'center', overflow: 'visible' } } });
+                return defaultRender({ ...props, styles: { root: { minHeight: 36 }, cell: { minHeight: 36, alignSelf: 'center', overflow: 'hidden' } } });
               }}
               styles={{
-                root: { overflow: 'visible' },
+                root: { overflow: 'hidden', minWidth: hasExtraColumnsVisible ? 1400 : undefined },
                 headerWrapper: {
                   position: 'sticky',
                   top: 0,
                   zIndex: 100,
                   backgroundColor: theme.palette.white,
                 },
-                contentWrapper: { overflow: 'visible' },
               }}
               onRenderDetailsHeader={(headerProps, defaultRender) => {
                 if (!headerProps || !defaultRender) return null;
@@ -1406,6 +1710,7 @@ export const ProductGrid: React.FC<IProductGridProps> = ({
               }}
               groupProps={{
                 showEmptyGroups: true,
+                collapseAllVisibility: CollapseAllVisibility.hidden,
                 onRenderHeader: (props) => {
                   if (!props || !props.group) return null;
                   const group = props.group;
@@ -1413,7 +1718,7 @@ export const ProductGrid: React.FC<IProductGridProps> = ({
                   const allChecked = groupItems.length > 0 && groupItems.every((p) => checkedIds.has(p.id));
                   const someChecked = !allChecked && groupItems.some((p) => checkedIds.has(p.id));
                   return (
-                    <div style={{ display: 'flex', alignItems: 'center', padding: '8px 0 8px 48px', borderBottom: `1px solid ${theme.palette.neutralLight}`, backgroundColor: theme.palette.neutralLighterAlt }}>
+                    <div style={{ display: 'flex', alignItems: 'center', padding: '6px 0', paddingLeft: 8, borderBottom: `1px solid ${theme.palette.neutralLight}`, backgroundColor: theme.palette.neutralLighterAlt }}>
                       <Checkbox
                         checked={allChecked}
                         indeterminate={someChecked}
@@ -1428,9 +1733,9 @@ export const ProductGrid: React.FC<IProductGridProps> = ({
                             return next;
                           });
                         }}
-                        styles={{ root: { marginRight: 8 } }}
+                        styles={{ root: { marginLeft: 0 } }}
                       />
-                      <Icon iconName={group.isCollapsed ? 'ChevronRight' : 'ChevronDown'} styles={{ root: { fontSize: 12, cursor: 'pointer', marginRight: 8 } }} onClick={() => props.onToggleCollapse?.(group)} />
+                      <Icon iconName={group.isCollapsed ? 'ChevronRight' : 'ChevronDown'} styles={{ root: { fontSize: 12, cursor: 'pointer', marginLeft: 8, marginRight: 8 } }} onClick={() => props.onToggleCollapse?.(group)} />
                       <Text styles={{ root: { fontWeight: 600, fontSize: 13 } }}>{group.name}</Text>
                     </div>
                   );
@@ -1615,6 +1920,182 @@ export const ProductGrid: React.FC<IProductGridProps> = ({
           <DefaultButton text="Cancel" onClick={() => setDeleteDialogHidden(true)} />
         </DialogFooter>
       </Dialog>
+
+      {/* SKU Reset Warning Dialog */}
+      <Dialog
+        hidden={!skuResetWarningOpen}
+        onDismiss={handleSkuResetCancel}
+        dialogContentProps={{
+          type: DialogType.normal,
+          title: 'SKU configuration will be reset',
+          subText: skuResetProductIds.length > 0
+            ? `Changing the region or commitment duration will remove all selected SKUs for ${products.find(p => p.id === skuResetProductIds[0])?.productDetails || 'this product'}. You'll need to configure the SKUs again.`
+            : 'SKU configuration will be reset.',
+        }}
+      >
+        <DialogFooter>
+          <PrimaryButton text="Continue" onClick={handleSkuResetContinue} />
+          <DefaultButton text="Cancel" onClick={handleSkuResetCancel} />
+        </DialogFooter>
+      </Dialog>
+
+      {/* Edit SKUs Panel */}
+      <Panel
+        isOpen={!!editSkuProductId}
+        onDismiss={() => setEditSkuProductId(null)}
+        type={PanelType.custom}
+        customWidth="900px"
+        headerText={editSkuProduct ? `Edit SKUs | ${editSkuProduct.productDetails}` : ''}
+        closeButtonAriaLabel="Close"
+        isFooterAtBottom
+        styles={{
+          content: { paddingTop: 16 },
+          header: { paddingBottom: 0 },
+          scrollableContent: { display: 'flex', flexDirection: 'column', height: '100%' },
+        }}
+        onRenderFooterContent={() => (
+          <Stack horizontal tokens={{ childrenGap: 8 }}>
+            <PrimaryButton text="Apply" onClick={handleSkuApply} />
+            <DefaultButton text="Cancel" onClick={() => setEditSkuProductId(null)} />
+          </Stack>
+        )}
+      >
+        <Stack tokens={{ childrenGap: 10 }}>
+          <Text styles={{ root: { fontSize: 13, lineHeight: '20px', color: theme.palette.neutralSecondary, marginBottom: 8 } }}>
+            Select the SKUs that you want to configure as a part of the product. Once you are done with selecting and editing the SKUs (if required), click on apply.
+          </Text>
+
+          <MessageBar messageBarType={MessageBarType.info} styles={{ root: { fontSize: 12 } }}>
+            By default, SKU discount, start date, and end date are inherited from the parent product. You can override these values by entering new ones in the respective fields.
+          </MessageBar>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', marginBottom: 4 }}>
+            <ActionButton
+              iconProps={{ iconName: 'Refresh' }}
+              text="Reset to default"
+              disabled={!skuHasEdits}
+              onClick={handleSkuResetToDefault}
+              styles={{ root: { fontSize: 12 } }}
+            />
+            <Stack.Item grow={1}><span /></Stack.Item>
+            <SearchBox placeholder="Search" styles={{ root: { width: 300 } }} />
+          </div>
+
+          {/* SKU Grid */}
+          <div style={{ overflow: 'auto', flex: 1 }}>
+            {/* Column Header Row */}
+            <div style={{ display: 'flex', alignItems: 'center', padding: '8px 0', borderBottom: `1px solid ${theme.palette.neutralLight}` }}>
+              <div style={{ width: 36, flexShrink: 0, paddingLeft: 4 }}>
+                <Checkbox
+                  checked={editSkuProduct ? (editSkuProduct.skus || []).length > 0 && (editSkuProduct.skus || []).every((s) => skuChecked.has(s.id)) : false}
+                  indeterminate={editSkuProduct ? !((editSkuProduct.skus || []).every((s) => skuChecked.has(s.id))) && (editSkuProduct.skus || []).some((s) => skuChecked.has(s.id)) : false}
+                  onChange={() => {
+                    if (!editSkuProduct || !editSkuProduct.skus) return;
+                    const allChecked = editSkuProduct.skus.every((s) => skuChecked.has(s.id));
+                    setSkuChecked((prev) => {
+                      const next = new Set(prev);
+                      if (allChecked) editSkuProduct.skus!.forEach((s) => next.delete(s.id));
+                      else editSkuProduct.skus!.forEach((s) => next.add(s.id));
+                      return next;
+                    });
+                  }}
+                />
+              </div>
+              <div style={{ flex: 1, minWidth: 0, fontSize: 12, fontWeight: 600, paddingLeft: 8 }}>Product description</div>
+              <div style={{ width: 120, flexShrink: 0, fontSize: 12, fontWeight: 600, paddingLeft: 8 }}>Discount %</div>
+              <div style={{ width: 160, flexShrink: 0, fontSize: 12, fontWeight: 600, paddingLeft: 12 }}>Start Date</div>
+              <div style={{ width: 160, flexShrink: 0, fontSize: 12, fontWeight: 600, paddingLeft: 12 }}>End Date</div>
+            </div>
+
+            {Array.from(skusByRegion.entries()).map(([region, skus]) => {
+              const allChecked = skus.every((s) => skuChecked.has(s.id));
+              const someChecked = !allChecked && skus.some((s) => skuChecked.has(s.id));
+              return (
+                <div key={region}>
+                  <div style={{ display: 'flex', alignItems: 'center', padding: '10px 0', borderBottom: `1px solid ${theme.palette.neutralLight}` }}>
+                    <div style={{ width: 36, flexShrink: 0, paddingLeft: 4 }}>
+                      <Checkbox
+                        checked={allChecked}
+                        indeterminate={someChecked}
+                        onChange={() => {
+                          setSkuChecked((prev) => {
+                            const next = new Set(prev);
+                            if (allChecked) skus.forEach((s) => next.delete(s.id));
+                            else skus.forEach((s) => next.add(s.id));
+                            return next;
+                          });
+                        }}
+                      />
+                    </div>
+                    <Icon iconName="ChevronDown" styles={{ root: { fontSize: 12, marginRight: 8 } }} />
+                    <Text styles={{ root: { fontWeight: 600, fontSize: 13 } }}>{region}</Text>
+                  </div>
+                  {skus.map((sku) => (
+                    <div key={sku.id} style={{ display: 'flex', alignItems: 'center', padding: '6px 0', borderBottom: `1px solid ${theme.palette.neutralLighterAlt}` }}>
+                      <div style={{ width: 36, flexShrink: 0, paddingLeft: 4 }}>
+                        <Checkbox
+                          checked={skuChecked.has(sku.id)}
+                          onChange={() => { setSkuChecked((prev) => { const next = new Set(prev); if (next.has(sku.id)) next.delete(sku.id); else next.add(sku.id); return next; }); }}
+                        />
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0, fontSize: 12, paddingLeft: 8, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {sku.skuType}, {sku.region}, {sku.commitment}
+                      </div>
+                      <div style={{ width: 120, flexShrink: 0, paddingLeft: 8 }}>
+                        <TextField
+                          value={String(skuEdits.get(sku.id)?.discountPercent ?? sku.discountPercent)}
+                          onChange={(_, val) => { const n = parseFloat(val || '0'); if (!isNaN(n) && n >= 0 && n <= 100) handleSkuEdit(sku.id, 'discountPercent', n); }}
+                          styles={{ root: { width: 80 }, fieldGroup: { height: 28, borderColor: theme.palette.neutralTertiaryAlt }, field: { fontSize: 12 } }}
+                          type="number"
+                        />
+                      </div>
+                      <div style={{ width: 160, flexShrink: 0, paddingLeft: 12 }} ref={(el) => { if (el) skuStartDateRefs.current.set(sku.id, el); }}>
+                        <Dropdown
+                          selectedKey={((skuEdits.get(sku.id)?.startDate ?? sku.startDate) as string) === 'At order acceptance' ? 'At order acceptance' : 'On specific date'}
+                          options={SKU_START_DATE_OPTIONS}
+                          onChange={(_, opt) => {
+                            if (opt?.key === 'At order acceptance') handleSkuEdit(sku.id, 'startDate', 'At order acceptance');
+                            else if (opt?.key === 'On specific date') setSkuStartDateCalendarOpen(sku.id);
+                          }}
+                          onRenderTitle={() => <span style={{ fontSize: 12 }}>{(skuEdits.get(sku.id)?.startDate ?? sku.startDate) as string || 'Select'}</span>}
+                          styles={skuDropdownStyles}
+                        />
+                        {skuStartDateCalendarOpen === sku.id && skuStartDateRefs.current.get(sku.id) && (
+                          <Callout target={skuStartDateRefs.current.get(sku.id)} onDismiss={() => setSkuStartDateCalendarOpen(null)} directionalHint={DirectionalHint.bottomLeftEdge} isBeakVisible={false} styles={{ root: { zIndex: 1000002 } }}>
+                            <Calendar onSelectDate={(date) => { if (date) { handleSkuEdit(sku.id, 'startDate', date.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' })); setSkuStartDateCalendarOpen(null); } }} />
+                          </Callout>
+                        )}
+                      </div>
+                      <div style={{ width: 160, flexShrink: 0, paddingLeft: 12 }} ref={(el) => { if (el) skuEndDateRefs.current.set(sku.id, el); }}>
+                        <Dropdown
+                          selectedKey={(() => { const v = (skuEdits.get(sku.id)?.endDate ?? sku.endDate) as string; return DURATION_KEYS.has(v) ? v : skuEndDateOptions.some((o) => o.key === v && o.itemType !== DropdownMenuItemType.Divider && o.itemType !== DropdownMenuItemType.Header) ? v : 'On specific date'; })()}
+                          options={skuEndDateOptions}
+                          onChange={(_, opt) => {
+                            if (!opt) return;
+                            if (opt.key === 'On specific date') setSkuEndDateCalendarOpen(sku.id);
+                            else if (DURATION_KEYS.has(opt.key as string)) {
+                              const skuStart = (skuEdits.get(sku.id)?.startDate ?? sku.startDate) as string;
+                              const computed = computeEndDateFromDuration(skuStart, opt.key as string);
+                              handleSkuEdit(sku.id, 'endDate', computed);
+                            }
+                          }}
+                          onRenderTitle={() => <span style={{ fontSize: 12 }}>{(skuEdits.get(sku.id)?.endDate ?? sku.endDate) as string || 'Select'}</span>}
+                          styles={skuDropdownStyles}
+                        />
+                        {skuEndDateCalendarOpen === sku.id && skuEndDateRefs.current.get(sku.id) && (
+                          <Callout target={skuEndDateRefs.current.get(sku.id)} onDismiss={() => setSkuEndDateCalendarOpen(null)} directionalHint={DirectionalHint.bottomLeftEdge} isBeakVisible={false} styles={{ root: { zIndex: 1000002 } }}>
+                            <Calendar onSelectDate={(date) => { if (date) { handleSkuEdit(sku.id, 'endDate', date.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' })); setSkuEndDateCalendarOpen(null); } }} />
+                          </Callout>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              );
+            })}
+          </div>
+        </Stack>
+      </Panel>
 
       {/* Columns Callout */}
       {isColumnsCalloutOpen && columnsBtnRef.current && (

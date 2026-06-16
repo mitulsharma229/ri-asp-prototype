@@ -90,19 +90,37 @@ const getClassNames = memoizeFunction((theme: ITheme) =>
   })
 );
 
+const SKU_TYPES = ['D64ads_v5', 'D32ads_v5', 'D16ads_v5'];
+
+const generateSkus = (productId: string, regions: string[], commitment: string) =>
+  regions.flatMap((region) =>
+    SKU_TYPES.map((skuType) => ({
+      id: `${productId}-${skuType}-${region}-${commitment}`.replace(/\s/g, ''),
+      skuType,
+      region,
+      commitment,
+      discountPercent: 0,
+      startDate: 'Mar 21, 2026',
+      endDate: 'Mar 21, 2029',
+    }))
+  );
+
 const convertCatalogToAdded = (catalog: ICatalogProduct): IAddedProduct => {
   const regionFromDetails = catalog.productDetails.match(/- ([A-Z][a-z]+ ?[A-Za-z]*)$/)?.[1] || '';
   const basePrice = catalog.listPriceNetUSD || 500.00;
   const tenants = (catalog.amendmentCode === 'M919' || catalog.amendmentCode === 'M(111)')
     ? ['tenant-a', 'tenant-b', 'tenant-c']
     : ['tenant-a', 'tenant-b'];
+  const regions = regionFromDetails ? [regionFromDetails] : ['US West'];
+  const commitment = '3 Years';
+  const skus = generateSkus(catalog.id, regions, commitment);
   return {
     id: catalog.id,
     productDetails: catalog.productDetails,
     productFamily: catalog.productFamily,
     amendmentCode: catalog.amendmentCode,
-    regions: regionFromDetails ? [regionFromDetails] : ['US West'],
-    commitment: '3 Years',
+    regions,
+    commitment,
     discountPercent: 0,
     startDate: 'Mar 21, 2026',
     endDate: 'Mar 21, 2029',
@@ -113,6 +131,7 @@ const convertCatalogToAdded = (catalog: ICatalogProduct): IAddedProduct => {
     regionApplicable: !!regionFromDetails,
     groupName: catalog.amendmentCode,
     tenants,
+    skus,
   };
 };
 
@@ -154,7 +173,15 @@ export const FutureProductsPage: React.FC = () => {
 
   const handleUpdateProduct = React.useCallback((id: string, field: keyof IAddedProduct, value: unknown) => {
     setProducts((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, [field]: value } : p))
+      prev.map((p) => {
+        if (p.id !== id) return p;
+        const updated = { ...p, [field]: value };
+        if (field === 'regions' || field === 'commitment') {
+          updated.skus = generateSkus(p.id, updated.regions, updated.commitment);
+          updated.selectedSkuIds = undefined;
+        }
+        return updated;
+      })
     );
     setHasUnsavedChanges(true);
   }, []);
@@ -215,6 +242,10 @@ export const FutureProductsPage: React.FC = () => {
           }
         } else if (values.endDate) {
           updated.endDate = values.endDate.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' });
+        }
+        if (values.regions || values.commitment) {
+          updated.skus = generateSkus(p.id, updated.regions, updated.commitment);
+          updated.selectedSkuIds = undefined;
         }
         return updated;
       })

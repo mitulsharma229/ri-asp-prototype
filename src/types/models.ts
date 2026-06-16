@@ -32,6 +32,18 @@ export interface IAddedProduct {
   regionApplicable: boolean;
   groupName: string;
   tenants: string[];
+  skus?: ISku[];
+  selectedSkuIds?: string[];
+}
+
+export interface ISku {
+  id: string;
+  skuType: string;
+  region: string;
+  commitment: string;
+  discountPercent: number;
+  startDate: string;
+  endDate: string;
 }
 
 export interface IAmendment {
